@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react'
 import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
+import { requestNotificationPermission } from '../lib/notifications'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
+    requestNotificationPermission()
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setInitialized(true)
+     
     })
 
     supabase.auth.onAuthStateChange((_event, session) => {
