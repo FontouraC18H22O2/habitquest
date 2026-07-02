@@ -75,35 +75,48 @@ export default function Home() {
   );
 
   async function toggleHabit(habit: Habit) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
 
-    const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split('T')[0]
 
-    if (habit.completed) {
-      // Remover log de hoje
-      await supabase
-        .from("habit_logs")
-        .delete()
-        .eq("habit_id", habit.id)
-        .gte("completed_at", `${today}T00:00:00`)
-        .lte("completed_at", `${today}T23:59:59`);
-    } else {
-      // Adicionar log
-      await supabase.from("habit_logs").insert({ habit_id: habit.id });
+  if (habit.completed) {
+    // Remover log de hoje
+    await supabase
+      .from('habit_logs')
+      .delete()
+      .eq('habit_id', habit.id)
+      .gte('completed_at', `${today}T00:00:00`)
+      .lte('completed_at', `${today}T23:59:59`)
 
-      // Dar XP ao utilizador
-      await supabase.rpc("increment_xp", { user_id: user.id, amount: 10 });
-    }
+    // Remover XP que foi dado hoje
+    await supabase.rpc('decrement_xp', { user_id: user.id, amount: 10 })
 
-    setHabits((prev) =>
-      prev.map((h) =>
-        h.id === habit.id ? { ...h, completed: !h.completed } : h,
-      ),
-    );
+  } else {
+    // Verificar se já completou hoje antes (segurança extra)
+    const { data: existingLog } = await supabase
+      .from('habit_logs')
+      .select('id')
+      .eq('habit_id', habit.id)
+      .gte('completed_at', `${today}T00:00:00`)
+      .lte('completed_at', `${today}T23:59:59`)
+      .limit(1)
+
+    if (existingLog && existingLog.length > 0) return
+
+    // Adicionar log
+    await supabase
+      .from('habit_logs')
+      .insert({ habit_id: habit.id })
+
+    // Dar XP
+    await supabase.rpc('increment_xp', { user_id: user.id, amount: 10 })
   }
+
+  setHabits(prev => prev.map(h =>
+    h.id === habit.id ? { ...h, completed: !h.completed } : h
+  ))
+}
 
   const completed = habits.filter((h) => h.completed).length;
   const total = habits.length;
@@ -114,13 +127,15 @@ export default function Home() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>
-            Olá, {username || "aventureiro"} 👋
+            Bem vindo, {username || "aventureiro"} 
           </Text>
           <Text style={styles.date}>
             {new Date().toLocaleDateString("pt-PT", {
               weekday: "long",
               day: "numeric",
               month: "long",
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </Text>
         </View>
