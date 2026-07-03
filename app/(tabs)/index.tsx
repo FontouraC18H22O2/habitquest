@@ -179,7 +179,7 @@ export default function Home() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Olá, {username || 'aventureiro'} 👋</Text>
+          <Text style={styles.greeting}>Olá, {username || 'aventureiro'} </Text>
           <Text style={styles.date}>
             {new Date().toLocaleDateString('pt-PT', {
               weekday: 'long', day: 'numeric', month: 'long'

@@ -4,7 +4,7 @@ import {
   Alert, Modal, TextInput, Image, ActivityIndicator
 } from 'react-native'
 import { supabase } from '../../lib/supabase'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -90,7 +90,6 @@ export default function Diet() {
       const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!)
       const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
 
-      // Converter imagem para base64
       const response = await fetch(imageUri)
       const blob = await response.blob()
       const base64 = await new Promise<string>((resolve) => {
@@ -128,9 +127,8 @@ export default function Diet() {
 
       setAiResult(parsed)
     } catch (e: any) {
-  console.log('Erro detalhado:', JSON.stringify(e))
-  console.log('Mensagem:', e?.message)
-  Alert.alert('Erro', e?.message || 'Não foi possível analisar a imagem. Tenta novamente.')
+      console.log('Erro:', e?.message)
+      Alert.alert('Erro', 'Não foi possível analisar a imagem. Tenta novamente.')
     }
     setAnalyzing(false)
   }
@@ -185,7 +183,6 @@ export default function Diet() {
 
     let photoUrl = null
 
-    // Upload da foto
     if (selectedImage) {
       const formData = new FormData()
       formData.append('file', {
@@ -281,9 +278,14 @@ export default function Diet() {
     <ScrollView style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>🥗 Dieta</Text>
-        <TouchableOpacity onPress={() => setShowGoalModal(true)}>
-          <Ionicons name="settings-outline" size={24} color="#888" />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => router.push('/diet-plan' as any)} style={{ marginRight: 16 }}>
+            <Ionicons name="calendar-outline" size={24} color="#6c63ff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowGoalModal(true)}>
+            <Ionicons name="settings-outline" size={24} color="#888" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Card de calorias */}
@@ -349,10 +351,7 @@ export default function Diet() {
       {/* Lista de refeições */}
       <View style={styles.mealsHeader}>
         <Text style={styles.sectionTitle}>Refeições de hoje</Text>
-        <TouchableOpacity
-          style={styles.addMealBtn}
-          onPress={() => setShowAddModal(true)}
-        >
+        <TouchableOpacity style={styles.addMealBtn} onPress={() => setShowAddModal(true)}>
           <Ionicons name="add" size={20} color="#ffffff" />
           <Text style={styles.addMealText}>Adicionar</Text>
         </TouchableOpacity>
@@ -398,7 +397,6 @@ export default function Diet() {
           <ScrollView style={styles.addModal}>
             <Text style={styles.modalTitle}>Nova Refeição</Text>
 
-            {/* Tipo de refeição */}
             <Text style={styles.modalLabel}>Tipo</Text>
             <View style={styles.mealTypeRow}>
               {MEAL_TYPES.map(type => (
@@ -415,7 +413,6 @@ export default function Diet() {
               ))}
             </View>
 
-            {/* Foto */}
             <Text style={styles.modalLabel}>Foto da refeição</Text>
             <View style={styles.photoButtons}>
               <TouchableOpacity style={styles.photoBtn} onPress={takePicture}>
@@ -428,12 +425,10 @@ export default function Diet() {
               </TouchableOpacity>
             </View>
 
-            {/* Preview da imagem */}
             {selectedImage && (
               <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
             )}
 
-            {/* Loading IA */}
             {analyzing && (
               <View style={styles.analyzingContainer}>
                 <ActivityIndicator size="large" color="#6c63ff" />
@@ -441,7 +436,6 @@ export default function Diet() {
               </View>
             )}
 
-            {/* Resultado da IA */}
             {aiResult && (
               <View style={styles.aiResult}>
                 <Text style={styles.aiResultTitle}>🤖 Análise da IA</Text>
@@ -496,7 +490,6 @@ export default function Diet() {
         <View style={styles.modalOverlay}>
           <View style={styles.goalModal}>
             <Text style={styles.modalTitle}>🎯 Metas diárias</Text>
-
             {[
               { key: 'calories', label: 'Calorias (kcal)' },
               { key: 'protein', label: 'Proteína (g)' },
@@ -514,7 +507,6 @@ export default function Diet() {
                 />
               </View>
             ))}
-
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowGoalModal(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
@@ -534,6 +526,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f1a', padding: 20, paddingTop: 56 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#ffffff' },
+  headerIcons: { flexDirection: 'row', alignItems: 'center' },
   caloriesCard: { backgroundColor: '#1e1e2e', borderRadius: 20, padding: 20, marginBottom: 16 },
   caloriesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   caloriesValue: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', textAlign: 'center' },

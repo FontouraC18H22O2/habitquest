@@ -202,10 +202,10 @@ export default function CreateHabit() {
   </View>
 </Modal>
 
-      {/* Recordatório */}
+      {/* Lembrete */}
       <View style={styles.reminderRow}>
         <View>
-          <Text style={styles.label}>Recordatório diário</Text>
+          <Text style={styles.label}>Lembrete diário</Text>
           <Text style={styles.reminderSub}>Notificação à hora escolhida</Text>
         </View>
         <TouchableOpacity
