@@ -168,21 +168,7 @@ export default function Profile() {
           )}
         </View>
       </View>
-      <TouchableOpacity
-        style={[styles.logoutBtn, { borderColor: "#6c63ff", marginBottom: 12 }]}
-        onPress={() =>
-          sendInstantNotification(
-            "🎯 Teste!",
-            "As notificações estão a funcionar!",
-          )
-        }
-      >
-        <Text style={[styles.logoutText, { color: "#6c63ff" }]}>
-          Testar notificação
-        </Text>
-      </TouchableOpacity>
-
-      {/* Botão de logout */}
+            {/* Botão de logout */}
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sair da conta</Text>
       </TouchableOpacity>

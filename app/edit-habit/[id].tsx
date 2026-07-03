@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ScrollView, Modal
 } from 'react-native'
-import { supabase } from '../lib/supabase'
-import { router } from 'expo-router'
-import { scheduleHabitReminder } from '../lib/notifications'
+import { supabase } from '../../lib/supabase'
+import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import ColorPicker, { Panel1, Swatches, Preview, HueSlider } from 'reanimated-color-picker'
+import { scheduleHabitReminder, cancelHabitReminder } from '../../lib/notifications'
 
 const ICONS = ['💪', '📚', '💧', '🏃', '🧘', '🥗', '😴', '✍️', '🎯', '🎨', '🚴', '🏊', '🎵', '🧹', '💊', '🐕', '🌿', '☕']
 
@@ -36,7 +36,8 @@ const FREQUENCIES = [
   { id: 'every_2hours', label: 'De 2 em 2 horas', icon: '🕑' },
 ]
 
-export default function CreateHabit() {
+export default function EditHabit() {
+  const { id } = useLocalSearchParams<{ id: string }>()
   const [name, setName] = useState('')
   const [selectedIcon, setSelectedIcon] = useState('🎯')
   const [selectedColor, setSelectedColor] = useState('#6c63ff')
@@ -52,35 +53,64 @@ export default function CreateHabit() {
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function handleCreate() {
+  useEffect(() => {
+    fetchHabit()
+  }, [])
+
+  async function fetchHabit() {
+    const { data } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (data) {
+      setName(data.name)
+      setSelectedIcon(data.icon || '🎯')
+      setSelectedColor(data.color || '#6c63ff')
+      setSelectedCategory(data.category || 'general')
+      setGoalValue(data.goal_value ? String(data.goal_value) : '')
+      setGoalUnit(data.goal_unit || '')
+      setReminderFrequency(data.reminder_frequency || 'once')
+      setReminderEndHour(data.reminder_end_hour || 22)
+      if (data.reminder_time) {
+        const [h, m] = data.reminder_time.split(':')
+        setReminderHour(parseInt(h))
+        setReminderMinute(parseInt(m))
+        setEnableReminder(true)
+      }
+    }
+  }
+
+  async function handleSave() {
     if (!name.trim()) {
       Alert.alert('Erro', 'Dá um nome ao hábito!')
       return
     }
 
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
 
-    const { data, error } = await supabase.from('habits').insert({
-      user_id: user?.id,
-      name: name.trim(),
-      icon: selectedIcon,
-      color: selectedColor,
-      frequency: 'daily',
-      category: selectedCategory,
-      goal_value: goalValue ? parseFloat(goalValue) : null,
-      goal_unit: goalUnit || null,
-      reminder_time: enableReminder ? `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}` : null,
-      reminder_frequency: enableReminder ? reminderFrequency : null,
-      reminder_end_hour: enableReminder ? reminderEndHour : null,
-    }).select()
+    const { error } = await supabase
+      .from('habits')
+      .update({
+        name: name.trim(),
+        icon: selectedIcon,
+        color: selectedColor,
+        category: selectedCategory,
+        goal_value: goalValue ? parseFloat(goalValue) : null,
+        goal_unit: goalUnit || null,
+        reminder_time: enableReminder ? `${String(reminderHour).padStart(2, '0')}:${String(reminderMinute).padStart(2, '0')}` : null,
+        reminder_frequency: enableReminder ? reminderFrequency : null,
+        reminder_end_hour: enableReminder ? reminderEndHour : null,
+      })
+      .eq('id', id)
 
     if (error) {
       Alert.alert('Erro', error.message)
     } else {
-      if (enableReminder && data && data[0]) {
+      if (enableReminder) {
         await scheduleHabitReminder(
-          data[0].id,
+          id,
           name.trim(),
           selectedIcon,
           reminderHour,
@@ -88,6 +118,8 @@ export default function CreateHabit() {
           reminderFrequency,
           reminderEndHour
         )
+      } else {
+        await cancelHabitReminder(id)
       }
       router.back()
     }
@@ -97,7 +129,13 @@ export default function CreateHabit() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Novo Hábito</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Editar Hábito</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
       {/* Nome */}
       <Text style={styles.label}>Nome</Text>
@@ -208,7 +246,7 @@ export default function CreateHabit() {
 
           {/* Hora de início */}
           <Text style={styles.label}>
-            {reminderFrequency === 'once' ? 'Hora do Lembrete' : 'Hora de início'}
+            {reminderFrequency === 'once' ? 'Hora do recordatório' : 'Hora de início'}
           </Text>
           <View style={styles.timeRow}>
             <View style={styles.timeColumn}>
@@ -256,15 +294,13 @@ export default function CreateHabit() {
         </View>
       )}
 
-      {/* Botão criar */}
+      {/* Botão guardar */}
       <TouchableOpacity
         style={[styles.button, { backgroundColor: selectedColor }]}
-        onPress={handleCreate}
+        onPress={handleSave}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>
-          {loading ? 'A criar...' : `${selectedIcon} Criar Hábito`}
-        </Text>
+        <Text style={styles.buttonText}>{loading ? 'A guardar...' : '💾 Guardar alterações'}</Text>
       </TouchableOpacity>
 
       {/* Modal unidades */}
@@ -315,7 +351,8 @@ export default function CreateHabit() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f1a', padding: 24 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#ffffff', marginBottom: 32, marginTop: 48 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, marginTop: 48 },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#ffffff' },
   label: { fontSize: 14, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
   input: {
     backgroundColor: '#1e1e2e', borderRadius: 12, padding: 16,
