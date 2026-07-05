@@ -6,6 +6,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { router } from 'expo-router'
 import { useTheme } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function Register() {
   const [email, setEmail] = useState('')
@@ -13,6 +14,7 @@ export default function Register() {
   const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const { colors } = useTheme()
+  const { t } = useTranslation()
 
   async function handleRegister() {
     setLoading(true)
@@ -41,16 +43,13 @@ export default function Register() {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={[styles.title, { color: colors.text }]}>HabitQuest 🎯</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Cria a tua conta</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.title, { color: colors.text }]}>LifePilot</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('create_account')}</Text>
 
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="Username"
+          placeholder={t('username')}
           placeholderTextColor={colors.textSecondary}
           value={username}
           onChangeText={setUsername}
@@ -58,7 +57,7 @@ export default function Register() {
         />
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="Email"
+          placeholder={t('email')}
           placeholderTextColor={colors.textSecondary}
           value={email}
           onChangeText={setEmail}
@@ -67,7 +66,7 @@ export default function Register() {
         />
         <TextInput
           style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="Password"
+          placeholder={t('password')}
           placeholderTextColor={colors.textSecondary}
           value={password}
           onChangeText={setPassword}
@@ -79,11 +78,11 @@ export default function Register() {
           onPress={handleRegister}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>{loading ? 'A criar conta...' : 'Criar conta'}</Text>
+          <Text style={styles.buttonText}>{loading ? t('creating_account') : t('register')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.link, { color: colors.primary }]}>Já tens conta? Entra aqui</Text>
+          <Text style={[styles.link, { color: colors.primary }]}>{t('have_account')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

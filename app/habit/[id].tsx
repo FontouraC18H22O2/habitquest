@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Camera from 'expo-camera'
 import { useTheme } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 type Log = {
   id: string
@@ -27,6 +28,7 @@ type Habit = {
 export default function HabitDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const [habit, setHabit] = useState<Habit | null>(null)
   const [logs, setLogs] = useState<Log[]>([])
   const [streak, setStreak] = useState(0)
@@ -40,22 +42,15 @@ export default function HabitDetail() {
   )
 
   async function fetchHabit() {
-    const { data } = await supabase
-      .from('habits')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const { data } = await supabase.from('habits').select('*').eq('id', id).single()
     if (data) setHabit(data)
   }
 
   async function fetchLogs() {
     const { data } = await supabase
-      .from('habit_logs')
-      .select('*')
-      .eq('habit_id', id)
+      .from('habit_logs').select('*').eq('habit_id', id)
       .not('photo_url', 'is', null)
-      .order('completed_at', { ascending: false })
-      .limit(10)
+      .order('completed_at', { ascending: false }).limit(10)
 
     if (data) {
       setLogs(data as Log[])
@@ -80,7 +75,7 @@ export default function HabitDetail() {
   async function takePhoto() {
     const { status } = await Camera.Camera.requestCameraPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permissão negada', 'Precisamos de acesso à câmara!')
+      Alert.alert('Erro', 'Precisamos de acesso à câmara!')
       return
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -93,7 +88,7 @@ export default function HabitDetail() {
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permissão negada', 'Precisamos de acesso à galeria!')
+      Alert.alert('Erro', 'Precisamos de acesso à galeria!')
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -114,8 +109,7 @@ export default function HabitDetail() {
       formData.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as any)
 
       const { error: uploadError } = await supabase.storage
-        .from('habit-photos')
-        .upload(filename, formData, { contentType: 'image/jpeg' })
+        .from('habit-photos').upload(filename, formData, { contentType: 'image/jpeg' })
 
       if (uploadError) { Alert.alert('Erro', uploadError.message); return }
 
@@ -123,35 +117,28 @@ export default function HabitDetail() {
 
       const today = new Date().toISOString().split('T')[0]
       const { data: todayLogs } = await supabase
-        .from('habit_logs')
-        .select('*')
-        .eq('habit_id', id)
-        .gte('completed_at', `${today}T00:00:00`)
-        .lte('completed_at', `${today}T23:59:59`)
-        .order('completed_at', { ascending: false })
-        .limit(1)
+        .from('habit_logs').select('*').eq('habit_id', id)
+        .gte('completed_at', `${today}T00:00:00`).lte('completed_at', `${today}T23:59:59`)
+        .order('completed_at', { ascending: false }).limit(1)
 
       if (todayLogs && todayLogs.length > 0) {
-        await supabase.from('habit_logs').insert({
-          habit_id: id, photo_url: publicUrl, note: 'Foto adicionada',
-        })
+        await supabase.from('habit_logs').insert({ habit_id: id, photo_url: publicUrl, note: t('photo_saved') })
         await fetchLogs()
-        Alert.alert('✅ Foto guardada!')
+        Alert.alert(t('photo_saved'))
       } else {
-        Alert.alert('Atenção', 'Completa o hábito hoje primeiro antes de adicionar uma foto!')
+        Alert.alert('Atenção', t('complete_first'))
       }
     } catch (e) {
-      console.log(e)
       Alert.alert('Erro', 'Não foi possível fazer upload da foto')
     }
     setUploading(false)
   }
 
   async function handleDelete() {
-    Alert.alert('Apagar hábito', 'Tens a certeza? Todo o histórico será apagado.', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('delete_habit'), t('delete_habit_confirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Apagar', style: 'destructive',
+        text: t('delete'), style: 'destructive',
         onPress: async () => {
           await supabase.from('habits').delete().eq('id', id)
           router.back()
@@ -164,7 +151,6 @@ export default function HabitDetail() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -180,42 +166,37 @@ export default function HabitDetail() {
         </View>
       </View>
 
-      {/* Streak */}
       <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: habit.color }]}>
         <Text style={styles.streakEmoji}>🔥</Text>
         <Text style={[styles.streakNumber, { color: colors.text }]}>{streak}</Text>
-        <Text style={[styles.streakLabel, { color: colors.textSecondary }]}>dias seguidos</Text>
+        <Text style={[styles.streakLabel, { color: colors.textSecondary }]}>{t('days_in_a_row')}</Text>
       </View>
 
-      {/* Botões de foto */}
-      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Adicionar prova de hoje</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('add_proof')}</Text>
       <View style={styles.photoButtons}>
         <TouchableOpacity
           style={[styles.photoBtn, { backgroundColor: habit.color }]}
-          onPress={takePhoto}
-          disabled={uploading}
+          onPress={takePhoto} disabled={uploading}
         >
           <Ionicons name="camera" size={24} color="#fff" />
-          <Text style={styles.photoBtnText}>Câmara</Text>
+          <Text style={styles.photoBtnText}>{t('camera')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.photoBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: habit.color }]}
-          onPress={pickFromGallery}
-          disabled={uploading}
+          onPress={pickFromGallery} disabled={uploading}
         >
           <Ionicons name="images" size={24} color={habit.color} />
-          <Text style={[styles.photoBtnText, { color: habit.color }]}>Galeria</Text>
+          <Text style={[styles.photoBtnText, { color: habit.color }]}>{t('gallery')}</Text>
         </TouchableOpacity>
       </View>
 
-      {uploading && <Text style={[styles.uploading, { color: colors.textSecondary }]}>A fazer upload...</Text>}
+      {uploading && <Text style={[styles.uploading, { color: colors.textSecondary }]}>{t('uploading')}</Text>}
 
-      {/* Histórico */}
-      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Histórico de fotos</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('photo_history')}</Text>
       {logs.length === 0 ? (
         <View style={styles.emptyPhotos}>
           <Text style={styles.emptyPhotosEmoji}>📷</Text>
-          <Text style={[styles.emptyPhotosText, { color: colors.textMuted }]}>Ainda não tens fotos deste hábito</Text>
+          <Text style={[styles.emptyPhotosText, { color: colors.textMuted }]}>{t('no_photos')}</Text>
         </View>
       ) : (
         logs.map(log => (
@@ -228,9 +209,7 @@ export default function HabitDetail() {
               </Text>
               {log.note && <Text style={[styles.logNote, { color: colors.textSecondary }]}>{log.note}</Text>}
             </View>
-            {log.photo_url && (
-              <Image source={{ uri: log.photo_url }} style={styles.logPhoto} />
-            )}
+            {log.photo_url && <Image source={{ uri: log.photo_url }} style={styles.logPhoto} />}
           </View>
         ))
       )}

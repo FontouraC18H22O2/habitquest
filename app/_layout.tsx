@@ -5,6 +5,9 @@ import { Session } from '@supabase/supabase-js'
 import { requestNotificationPermission } from '../lib/notifications'
 import { ThemeProvider } from '../lib/ThemeContext'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { LanguageProvider } from '../lib/LanguageContext'
+import '../lib/i18n'
+
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
@@ -38,13 +41,15 @@ export default function RootLayout() {
   }, [initialized, session])
 
   return (
-  <ThemeProvider>
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(auth)" />
-      </Stack>
-    </SafeAreaProvider>
-  </ThemeProvider>
+  <LanguageProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(auth)" />
+        </Stack>
+      </SafeAreaProvider>
+    </ThemeProvider>
+  </LanguageProvider>
 )
 }

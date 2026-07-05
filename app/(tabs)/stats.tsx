@@ -5,6 +5,7 @@ import { useFocusEffect } from 'expo-router'
 import { VictoryBar, VictoryChart, VictoryTheme, VictoryAxis } from 'victory-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { useTabBarHeight } from '../../lib/useTabBarHeight'
+import { useTranslation } from 'react-i18next'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
@@ -15,6 +16,7 @@ type DayLog = {
 
 export default function Stats() {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const tabBarHeight = useTabBarHeight()
   const [weekData, setWeekData] = useState<{ x: string; y: number }[]>([])
   const [heatmap, setHeatmap] = useState<DayLog[]>([])
@@ -58,7 +60,7 @@ export default function Stats() {
     }
     setHeatmap(heatmapData)
 
-    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const days = [t('sun'), t('mon'), t('tue'), t('wed'), t('thu'), t('fri'), t('sat')]
     const weekMap: Record<string, number> = {}
     const weekDates: string[] = []
 
@@ -100,25 +102,25 @@ export default function Stats() {
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: tabBarHeight }}
     >
-      <Text style={[styles.title, { color: colors.text }]}>📊 Estatísticas</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{t('statistics')}</Text>
 
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.statValue, { color: colors.text }]}>{totalHabits}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Hábitos</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('habits')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.statValue, { color: colors.text }]}>{totalCompletions}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Completados</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('completed')}</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: colors.card }]}>
           <Text style={[styles.statValue, { color: colors.text }]}>{bestStreak}</Text>
-          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Melhor streak</Text>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('best_streak')}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Últimos 7 dias</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('last_7_days')}</Text>
         <View style={[styles.chartContainer, { backgroundColor: colors.card }]}>
           {weekData.length > 0 && (
             <VictoryChart
@@ -144,18 +146,18 @@ export default function Stats() {
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Últimos 30 dias</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('last_30_days')}</Text>
         <View style={styles.heatmap}>
           {heatmap.map((day, i) => (
             <View key={i} style={[styles.heatmapCell, { backgroundColor: getHeatmapColor(day.count) }]} />
           ))}
         </View>
         <View style={styles.heatmapLegend}>
-          <Text style={[styles.legendText, { color: colors.textSecondary }]}>Menos</Text>
+          <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('less')}</Text>
           {[0, 1, 2, 3].map(v => (
             <View key={v} style={[styles.legendCell, { backgroundColor: getHeatmapColor(v) }]} />
           ))}
-          <Text style={[styles.legendText, { color: colors.textSecondary }]}>Mais</Text>
+          <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('more')}</Text>
         </View>
       </View>
     </ScrollView>

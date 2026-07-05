@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../lib/ThemeContext'
 import { useTabBarHeight } from '../../lib/useTabBarHeight'
+import { useTranslation } from 'react-i18next'
 
 type Habit = {
   id: string
@@ -29,6 +30,7 @@ export default function Home() {
   const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null)
   const [progressValue, setProgressValue] = useState('')
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const tabBarHeight = useTabBarHeight()
 
   async function fetchHabits() {
@@ -36,35 +38,26 @@ export default function Home() {
     if (!user) return
 
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', user.id)
-      .single()
+      .from('profiles').select('username').eq('id', user.id).single()
     if (profile) setUsername(profile.username)
 
     const { data: habitsData } = await supabase
-      .from('habits')
-      .select('id, name, icon, color, goal_value, goal_unit, archived')
-      .eq('user_id', user.id)
-      .eq('archived', false)
+      .from('habits').select('id, name, icon, color, goal_value, goal_unit, archived')
+      .eq('user_id', user.id).eq('archived', false)
 
     if (!habitsData) return
 
     const today = new Date().toISOString().split('T')[0]
 
     const { data: logs } = await supabase
-      .from('habit_logs')
-      .select('habit_id')
-      .gte('completed_at', `${today}T00:00:00`)
-      .lte('completed_at', `${today}T23:59:59`)
+      .from('habit_logs').select('habit_id')
+      .gte('completed_at', `${today}T00:00:00`).lte('completed_at', `${today}T23:59:59`)
 
     const completedIds = new Set(logs?.map(l => l.habit_id) || [])
 
     const { data: progressLogs } = await supabase
-      .from('habit_logs')
-      .select('habit_id, value')
-      .gte('completed_at', `${today}T00:00:00`)
-      .lte('completed_at', `${today}T23:59:59`)
+      .from('habit_logs').select('habit_id, value')
+      .gte('completed_at', `${today}T00:00:00`).lte('completed_at', `${today}T23:59:59`)
 
     const progressMap: Record<string, number> = {}
     progressLogs?.forEach(log => {
@@ -72,9 +65,7 @@ export default function Home() {
     })
 
     setHabits(habitsData.map(h => ({
-      ...h,
-      completed: completedIds.has(h.id),
-      progress_today: progressMap[h.id] || 0
+      ...h, completed: completedIds.has(h.id), progress_today: progressMap[h.id] || 0
     })))
     setLoading(false)
   }
@@ -84,7 +75,6 @@ export default function Home() {
   async function toggleHabit(habit: Habit) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const today = new Date().toISOString().split('T')[0]
 
     if (habit.completed) {
@@ -106,7 +96,6 @@ export default function Home() {
   async function toggleHabitWithValue(habit: Habit, value: number) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const today = new Date().toISOString().split('T')[0]
 
     if (habit.completed) {
@@ -128,12 +117,12 @@ export default function Home() {
     if (goalReached) {
       await supabase.rpc('increment_xp', { user_id: user.id, amount: 10 })
       setHabits(prev => prev.map(h => h.id === habit.id ? { ...h, completed: true, progress_today: totalToday } : h))
-      Alert.alert('🎉 Meta atingida!', `Completaste ${habit.name}!`)
+      Alert.alert(t('goal_reached'), `${t('completed')} ${habit.name}!`)
     } else {
       const remaining = (habit.goal_value || 0) - totalToday
       setHabits(prev => prev.map(h => h.id === habit.id ? { ...h, progress_today: totalToday } : h))
-      Alert.alert('📊 Progresso registado!',
-        `${totalToday} ${habit.goal_unit} de ${habit.goal_value} ${habit.goal_unit}\nFaltam ${remaining.toFixed(1)} ${habit.goal_unit} para a meta!`)
+      Alert.alert(t('progress_saved'),
+        `${totalToday} ${habit.goal_unit} / ${habit.goal_value} ${habit.goal_unit}\n${t('remaining')} ${remaining.toFixed(1)} ${habit.goal_unit} ${t('for_goal')}`)
     }
   }
 
@@ -144,7 +133,9 @@ export default function Home() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <View>
-          <Text style={[styles.greeting, { color: colors.text }]}>Olá, {username || 'aventureiro'} 👋</Text>
+          <Text style={[styles.greeting, { color: colors.text }]}>
+            {t('hello')}, {username || t('adventurer')} 👋
+          </Text>
           <Text style={[styles.date, { color: colors.textSecondary }]}>
             {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
@@ -156,21 +147,23 @@ export default function Home() {
 
       {total > 0 && (
         <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.progressText, { color: colors.text }]}>{completed}/{total} hábitos completos hoje</Text>
+          <Text style={[styles.progressText, { color: colors.text }]}>
+            {completed}/{total} {t('habits_complete')}
+          </Text>
           <View style={[styles.progressBar, { backgroundColor: colors.card2 }]}>
             <View style={[styles.progressFill, { width: `${(completed / total) * 100}%`, backgroundColor: colors.primary }]} />
           </View>
-          {completed === total && <Text style={styles.allDone}>🎉 Completaste todos os hábitos hoje!</Text>}
+          {completed === total && <Text style={styles.allDone}>{t('all_done')}</Text>}
         </View>
       )}
 
       {loading ? (
-        <Text style={[styles.emptyText, { color: colors.text }]}>A carregar...</Text>
+        <Text style={[styles.emptyText, { color: colors.text }]}>{t('loading')}</Text>
       ) : habits.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>🌱</Text>
-          <Text style={[styles.emptyText, { color: colors.text }]}>Ainda não tens hábitos!</Text>
-          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Clica no + para criar o teu primeiro hábito</Text>
+          <Text style={[styles.emptyText, { color: colors.text }]}>{t('no_habits')}</Text>
+          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>{t('no_habits_sub')}</Text>
         </View>
       ) : (
         <FlatList
@@ -227,12 +220,12 @@ export default function Home() {
             <Text style={styles.modalEmoji}>{selectedHabit?.icon}</Text>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedHabit?.name}</Text>
             <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-              Meta: {selectedHabit?.goal_value} {selectedHabit?.goal_unit}
-              {selectedHabit?.progress_today ? ` • Hoje: ${selectedHabit.progress_today} ${selectedHabit.goal_unit}` : ''}
+              {t('goal')}: {selectedHabit?.goal_value} {selectedHabit?.goal_unit}
+              {selectedHabit?.progress_today ? ` • ${t('today')}: ${selectedHabit.progress_today} ${selectedHabit.goal_unit}` : ''}
             </Text>
             <TextInput
               style={[styles.progressInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-              placeholder={`Adicionar (${selectedHabit?.goal_unit})`}
+              placeholder={`${t('add')} (${selectedHabit?.goal_unit})`}
               placeholderTextColor={colors.textSecondary}
               value={progressValue}
               onChangeText={setProgressValue}
@@ -244,7 +237,7 @@ export default function Home() {
                 style={[styles.modalCancelBtn, { backgroundColor: colors.card2 }]}
                 onPress={() => { setProgressModalVisible(false); setProgressValue('') }}
               >
-                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalConfirmBtn, { backgroundColor: selectedHabit?.color }]}
@@ -256,7 +249,7 @@ export default function Home() {
                   }
                 }}
               >
-                <Text style={styles.modalConfirmText}>Confirmar</Text>
+                <Text style={styles.modalConfirmText}>{t('confirm')}</Text>
               </TouchableOpacity>
             </View>
           </View>

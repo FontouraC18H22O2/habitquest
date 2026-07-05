@@ -9,20 +9,9 @@ import { Ionicons } from '@expo/vector-icons'
 import ColorPicker, { Panel1, Swatches, Preview, HueSlider } from 'reanimated-color-picker'
 import { scheduleHabitReminder, cancelHabitReminder } from '../../lib/notifications'
 import { useTheme } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 const ICONS = ['💪', '📚', '💧', '🏃', '🧘', '🥗', '😴', '✍️', '🎯', '🎨', '🚴', '🏊', '🎵', '🧹', '💊', '🐕', '🌿', '☕']
-
-const CATEGORIES = [
-  { id: 'exercise', label: 'Exercício', icon: '🏃' },
-  { id: 'health', label: 'Saúde', icon: '💊' },
-  { id: 'learning', label: 'Aprendizagem', icon: '📚' },
-  { id: 'mindfulness', label: 'Mindfulness', icon: '🧘' },
-  { id: 'nutrition', label: 'Nutrição', icon: '🥗' },
-  { id: 'sleep', label: 'Sono', icon: '😴' },
-  { id: 'general', label: 'Geral', icon: '🎯' },
-]
-
-const UNITS = ['km', 'ml', 'L', 'min', 'h', 'páginas', 'copos', 'séries', 'reps', 'kcal', 'passos']
 
 const PRESET_COLORS = [
   '#6c63ff', '#ff6584', '#43e97b', '#f7971e',
@@ -30,16 +19,12 @@ const PRESET_COLORS = [
   '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd',
 ]
 
-const FREQUENCIES = [
-  { id: 'once', label: 'Uma vez', icon: '🔔' },
-  { id: 'every_30min', label: 'De 30 em 30 min', icon: '⏱️' },
-  { id: 'every_hour', label: 'De hora a hora', icon: '🕐' },
-  { id: 'every_2hours', label: 'De 2 em 2 horas', icon: '🕑' },
-]
+const UNITS = ['km', 'ml', 'L', 'min', 'h', 'páginas', 'copos', 'séries', 'reps', 'kcal', 'passos']
 
 export default function EditHabit() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [selectedIcon, setSelectedIcon] = useState('🎯')
   const [selectedColor, setSelectedColor] = useState('#6c63ff')
@@ -54,6 +39,23 @@ export default function EditHabit() {
   const [showUnitPicker, setShowUnitPicker] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const CATEGORIES = [
+    { id: 'exercise', label: t('exercise'), icon: '🏃' },
+    { id: 'health', label: t('health'), icon: '💊' },
+    { id: 'learning', label: t('learning'), icon: '📚' },
+    { id: 'mindfulness', label: t('mindfulness'), icon: '🧘' },
+    { id: 'nutrition', label: t('nutrition'), icon: '🥗' },
+    { id: 'sleep', label: t('sleep'), icon: '😴' },
+    { id: 'general', label: t('general'), icon: '🎯' },
+  ]
+
+  const FREQUENCIES = [
+    { id: 'once', label: t('once'), icon: '🔔' },
+    { id: 'every_30min', label: t('every_30min'), icon: '⏱️' },
+    { id: 'every_hour', label: t('every_hour'), icon: '🕐' },
+    { id: 'every_2hours', label: t('every_2hours'), icon: '🕑' },
+  ]
 
   useEffect(() => { fetchHabit() }, [])
 
@@ -78,7 +80,7 @@ export default function EditHabit() {
   }
 
   async function handleSave() {
-    if (!name.trim()) { Alert.alert('Erro', 'Dá um nome ao hábito!'); return }
+    if (!name.trim()) { Alert.alert('Erro', t('habit_name_placeholder')); return }
     setLoading(true)
 
     const { error } = await supabase.from('habits').update({
@@ -110,20 +112,20 @@ export default function EditHabit() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Editar Hábito</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('edit_habit')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Nome</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('habit_name')}</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-        placeholder="Ex: Correr 10km, Beber água..."
+        placeholder={t('habit_name_placeholder')}
         placeholderTextColor={colors.textSecondary}
         value={name}
         onChangeText={setName}
       />
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Categoria</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('category')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
         {CATEGORIES.map(cat => (
           <TouchableOpacity
@@ -139,7 +141,7 @@ export default function EditHabit() {
         ))}
       </ScrollView>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Meta diária (opcional)</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('daily_goal')}</Text>
       <View style={styles.goalRow}>
         <TextInput
           style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
@@ -149,13 +151,16 @@ export default function EditHabit() {
           onChangeText={setGoalValue}
           keyboardType="numeric"
         />
-        <TouchableOpacity style={[styles.unitBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setShowUnitPicker(true)}>
-          <Text style={[styles.unitBtnText, { color: colors.textSecondary }]}>{goalUnit || 'Unidade'}</Text>
+        <TouchableOpacity
+          style={[styles.unitBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => setShowUnitPicker(true)}
+        >
+          <Text style={[styles.unitBtnText, { color: colors.textSecondary }]}>{goalUnit || t('unit')}</Text>
           <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Ícone</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('icon')}</Text>
       <View style={styles.grid}>
         {ICONS.map(icon => (
           <TouchableOpacity
@@ -169,7 +174,7 @@ export default function EditHabit() {
         ))}
       </View>
 
-      <Text style={[styles.label, { color: colors.textSecondary }]}>Cor</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{t('color')}</Text>
       <View style={styles.colorGrid}>
         {PRESET_COLORS.map(color => (
           <TouchableOpacity
@@ -193,20 +198,20 @@ export default function EditHabit() {
 
       <View style={styles.reminderRow}>
         <View>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Recordatório diário</Text>
-          <Text style={[styles.reminderSub, { color: colors.textMuted }]}>Notificação à hora escolhida</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{t('reminder')}</Text>
+          <Text style={[styles.reminderSub, { color: colors.textMuted }]}>{t('reminder_sub')}</Text>
         </View>
         <TouchableOpacity
           style={[styles.toggle, { backgroundColor: enableReminder ? selectedColor : colors.card2 }]}
           onPress={() => setEnableReminder(!enableReminder)}
         >
-          <Text style={styles.toggleText}>{enableReminder ? 'Ativo' : 'Inativo'}</Text>
+          <Text style={styles.toggleText}>{enableReminder ? t('active') : t('inactive')}</Text>
         </TouchableOpacity>
       </View>
 
       {enableReminder && (
         <View>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Frequência</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{t('frequency')}</Text>
           <View style={styles.frequencyGrid}>
             {FREQUENCIES.map(freq => (
               <TouchableOpacity
@@ -223,7 +228,7 @@ export default function EditHabit() {
           </View>
 
           <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {reminderFrequency === 'once' ? 'Hora do recordatório' : 'Hora de início'}
+            {reminderFrequency === 'once' ? t('reminder_time') : t('start_time')}
           </Text>
           <View style={styles.timeRow}>
             <View style={styles.timeColumn}>
@@ -249,7 +254,7 @@ export default function EditHabit() {
 
           {reminderFrequency !== 'once' && (
             <>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>Hora de fim</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>{t('end_time')}</Text>
               <View style={styles.timeRow}>
                 <View style={styles.timeColumn}>
                   <TouchableOpacity style={[styles.timeBtn, { backgroundColor: colors.card }]} onPress={() => setReminderEndHour(h => Math.min(23, h + 1))}>
@@ -263,7 +268,7 @@ export default function EditHabit() {
                 <Text style={[styles.timeSeparator, { color: colors.text }]}>:00</Text>
               </View>
               <Text style={[styles.reminderSub, { color: colors.textMuted }]}>
-                Vais receber notificações das {String(reminderHour).padStart(2, '0')}h às {String(reminderEndHour).padStart(2, '0')}h
+                {String(reminderHour).padStart(2, '0')}h → {String(reminderEndHour).padStart(2, '0')}h
               </Text>
             </>
           )}
@@ -275,13 +280,13 @@ export default function EditHabit() {
         onPress={handleSave}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>{loading ? 'A guardar...' : '💾 Guardar alterações'}</Text>
+        <Text style={styles.buttonText}>{loading ? t('saving') : t('save_changes')}</Text>
       </TouchableOpacity>
 
       <Modal visible={showUnitPicker} transparent animationType="slide">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowUnitPicker(false)}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Escolhe a unidade</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('choose_unit')}</Text>
             {UNITS.map(unit => (
               <TouchableOpacity
                 key={unit}
@@ -298,7 +303,7 @@ export default function EditHabit() {
       <Modal visible={showColorPicker} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.colorPickerModal, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Escolhe uma cor</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('choose_color')}</Text>
             <ColorPicker
               style={{ width: '100%' }}
               value={selectedColor}
@@ -313,7 +318,7 @@ export default function EditHabit() {
               style={[styles.button, { backgroundColor: selectedColor, marginTop: 24, marginBottom: 0 }]}
               onPress={() => setShowColorPicker(false)}
             >
-              <Text style={styles.buttonText}>Confirmar</Text>
+              <Text style={styles.buttonText}>{t('confirm')}</Text>
             </TouchableOpacity>
           </View>
         </View>
