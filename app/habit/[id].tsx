@@ -8,6 +8,7 @@ import { router, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as Camera from 'expo-camera'
+import { useTheme } from '../../lib/ThemeContext'
 
 type Log = {
   id: string
@@ -25,6 +26,7 @@ type Habit = {
 
 export default function HabitDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const { colors } = useTheme()
   const [habit, setHabit] = useState<Habit | null>(null)
   const [logs, setLogs] = useState<Log[]>([])
   const [streak, setStreak] = useState(0)
@@ -64,7 +66,6 @@ export default function HabitDetail() {
   function calculateStreak(logs: Log[]) {
     let streak = 0
     const today = new Date()
-
     for (let i = 0; i < 30; i++) {
       const d = new Date(today)
       d.setDate(d.getDate() - i)
@@ -82,17 +83,11 @@ export default function HabitDetail() {
       Alert.alert('Permissão negada', 'Precisamos de acesso à câmara!')
       return
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
+      allowsEditing: true, aspect: [4, 3], quality: 0.7,
     })
-
-    if (!result.canceled) {
-      await uploadPhoto(result.assets[0].uri)
-    }
+    if (!result.canceled) await uploadPhoto(result.assets[0].uri)
   }
 
   async function pickFromGallery() {
@@ -101,17 +96,11 @@ export default function HabitDetail() {
       Alert.alert('Permissão negada', 'Precisamos de acesso à galeria!')
       return
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
+      allowsEditing: true, aspect: [4, 3], quality: 0.7,
     })
-
-    if (!result.canceled) {
-      await uploadPhoto(result.assets[0].uri)
-    }
+    if (!result.canceled) await uploadPhoto(result.assets[0].uri)
   }
 
   async function uploadPhoto(uri: string) {
@@ -121,26 +110,16 @@ export default function HabitDetail() {
       if (!user) return
 
       const filename = `${user.id}/${id}/${Date.now()}.jpg`
-
       const formData = new FormData()
-      formData.append('file', {
-        uri,
-        name: 'photo.jpg',
-        type: 'image/jpeg',
-      } as any)
+      formData.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as any)
 
       const { error: uploadError } = await supabase.storage
         .from('habit-photos')
         .upload(filename, formData, { contentType: 'image/jpeg' })
 
-      if (uploadError) {
-        Alert.alert('Erro', uploadError.message)
-        return
-      }
+      if (uploadError) { Alert.alert('Erro', uploadError.message); return }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('habit-photos')
-        .getPublicUrl(filename)
+      const { data: { publicUrl } } = supabase.storage.from('habit-photos').getPublicUrl(filename)
 
       const today = new Date().toISOString().split('T')[0]
       const { data: todayLogs } = await supabase
@@ -154,11 +133,8 @@ export default function HabitDetail() {
 
       if (todayLogs && todayLogs.length > 0) {
         await supabase.from('habit_logs').insert({
-          habit_id: id,
-          photo_url: publicUrl,
-          note: 'Foto adicionada',
+          habit_id: id, photo_url: publicUrl, note: 'Foto adicionada',
         })
-
         await fetchLogs()
         Alert.alert('✅ Foto guardada!')
       } else {
@@ -175,8 +151,7 @@ export default function HabitDetail() {
     Alert.alert('Apagar hábito', 'Tens a certeza? Todo o histórico será apagado.', [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Apagar',
-        style: 'destructive',
+        text: 'Apagar', style: 'destructive',
         onPress: async () => {
           await supabase.from('habits').delete().eq('id', id)
           router.back()
@@ -188,32 +163,32 @@ export default function HabitDetail() {
   if (!habit) return null
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>{habit.icon} {habit.name}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{habit.icon} {habit.name}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => router.push(`/edit-habit/${id}` as any)}>
-            <Ionicons name="pencil-outline" size={22} color="#888" />
+            <Ionicons name="pencil-outline" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={22} color="#ff6584" />
+            <Ionicons name="trash-outline" size={22} color={colors.danger} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Streak */}
-      <View style={[styles.streakCard, { borderColor: habit.color }]}>
+      <View style={[styles.streakCard, { backgroundColor: colors.card, borderColor: habit.color }]}>
         <Text style={styles.streakEmoji}>🔥</Text>
-        <Text style={styles.streakNumber}>{streak}</Text>
-        <Text style={styles.streakLabel}>dias seguidos</Text>
+        <Text style={[styles.streakNumber, { color: colors.text }]}>{streak}</Text>
+        <Text style={[styles.streakLabel, { color: colors.textSecondary }]}>dias seguidos</Text>
       </View>
 
       {/* Botões de foto */}
-      <Text style={styles.sectionTitle}>Adicionar prova de hoje</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Adicionar prova de hoje</Text>
       <View style={styles.photoButtons}>
         <TouchableOpacity
           style={[styles.photoBtn, { backgroundColor: habit.color }]}
@@ -224,7 +199,7 @@ export default function HabitDetail() {
           <Text style={styles.photoBtnText}>Câmara</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.photoBtn, { backgroundColor: '#1e1e2e', borderWidth: 1, borderColor: habit.color }]}
+          style={[styles.photoBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: habit.color }]}
           onPress={pickFromGallery}
           disabled={uploading}
         >
@@ -233,25 +208,25 @@ export default function HabitDetail() {
         </TouchableOpacity>
       </View>
 
-      {uploading && <Text style={styles.uploading}>A fazer upload...</Text>}
+      {uploading && <Text style={[styles.uploading, { color: colors.textSecondary }]}>A fazer upload...</Text>}
 
       {/* Histórico */}
-      <Text style={styles.sectionTitle}>Histórico de fotos</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Histórico de fotos</Text>
       {logs.length === 0 ? (
         <View style={styles.emptyPhotos}>
           <Text style={styles.emptyPhotosEmoji}>📷</Text>
-          <Text style={styles.emptyPhotosText}>Ainda não tens fotos deste hábito</Text>
+          <Text style={[styles.emptyPhotosText, { color: colors.textMuted }]}>Ainda não tens fotos deste hábito</Text>
         </View>
       ) : (
         logs.map(log => (
-          <View key={log.id} style={styles.logCard}>
+          <View key={log.id} style={[styles.logCard, { backgroundColor: colors.card }]}>
             <View style={styles.logInfo}>
-              <Text style={styles.logDate}>
+              <Text style={[styles.logDate, { color: colors.text }]}>
                 {new Date(log.completed_at).toLocaleDateString('pt-PT', {
                   weekday: 'short', day: 'numeric', month: 'short',
                 })}
               </Text>
-              {log.note && <Text style={styles.logNote}>{log.note}</Text>}
+              {log.note && <Text style={[styles.logNote, { color: colors.textSecondary }]}>{log.note}</Text>}
             </View>
             {log.photo_url && (
               <Image source={{ uri: log.photo_url }} style={styles.logPhoto} />
@@ -264,34 +239,25 @@ export default function HabitDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a', padding: 20, paddingTop: 56 },
+  container: { flex: 1, padding: 20, paddingTop: 56 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', flex: 1, textAlign: 'center' },
+  title: { fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
   headerActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  streakCard: {
-    backgroundColor: '#1e1e2e', borderRadius: 20, padding: 24,
-    alignItems: 'center', marginBottom: 32, borderWidth: 2,
-  },
+  streakCard: { borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 32, borderWidth: 2 },
   streakEmoji: { fontSize: 40, marginBottom: 8 },
-  streakNumber: { fontSize: 56, fontWeight: 'bold', color: '#ffffff' },
-  streakLabel: { fontSize: 16, color: '#888', marginTop: 4 },
-  sectionTitle: {
-    fontSize: 13, fontWeight: 'bold', color: '#888',
-    marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1,
-  },
+  streakNumber: { fontSize: 56, fontWeight: 'bold' },
+  streakLabel: { fontSize: 16, marginTop: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: 'bold', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
   photoButtons: { flexDirection: 'row', gap: 12, marginBottom: 32 },
   photoBtn: { flex: 1, borderRadius: 12, padding: 16, alignItems: 'center', gap: 8 },
   photoBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
-  uploading: { color: '#888', textAlign: 'center', marginBottom: 16 },
+  uploading: { textAlign: 'center', marginBottom: 16 },
   emptyPhotos: { alignItems: 'center', paddingVertical: 32 },
   emptyPhotosEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyPhotosText: { color: '#555', fontSize: 14 },
-  logCard: {
-    backgroundColor: '#1e1e2e', borderRadius: 16, padding: 16,
-    marginBottom: 12, flexDirection: 'row', alignItems: 'center',
-  },
+  emptyPhotosText: { fontSize: 14 },
+  logCard: { borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center' },
   logInfo: { flex: 1 },
-  logDate: { color: '#ffffff', fontSize: 14, fontWeight: '500' },
-  logNote: { color: '#888', fontSize: 13, marginTop: 4 },
+  logDate: { fontSize: 14, fontWeight: '500' },
+  logNote: { fontSize: 13, marginTop: 4 },
   logPhoto: { width: 60, height: 60, borderRadius: 12 },
 })

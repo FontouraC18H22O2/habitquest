@@ -8,6 +8,8 @@ import { useFocusEffect, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { useTheme } from '../../lib/ThemeContext'
+import { useTabBarHeight } from '../../lib/useTabBarHeight'
 
 type Meal = {
   id: string
@@ -36,6 +38,8 @@ const MEAL_TYPES = [
 ]
 
 export default function Diet() {
+  const { colors } = useTheme()
+  const tabBarHeight = useTabBarHeight()
   const [meals, setMeals] = useState<Meal[]>([])
   const [goal, setGoal] = useState<DietGoal>({ daily_calories: 2000, daily_protein: 150, daily_carbs: 250, daily_fat: 65 })
   const [loading, setLoading] = useState(true)
@@ -48,62 +52,44 @@ export default function Diet() {
   const [goalInputs, setGoalInputs] = useState({ calories: '2000', protein: '150', carbs: '250', fat: '65' })
 
   async function fetchData() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
-  const today = new Date().toISOString().split('T')[0]
-  const todayDayOfWeek = new Date().getDay()
+    const today = new Date().toISOString().split('T')[0]
+    const todayDayOfWeek = new Date().getDay()
 
-  const { data: mealsData } = await supabase
-    .from('meals')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('eaten_at', `${today}T00:00:00`)
-    .lte('eaten_at', `${today}T23:59:59`)
-    .order('eaten_at', { ascending: false })
+    const { data: mealsData } = await supabase
+      .from('meals').select('*').eq('user_id', user.id)
+      .gte('eaten_at', `${today}T00:00:00`).lte('eaten_at', `${today}T23:59:59`)
+      .order('eaten_at', { ascending: false })
 
-  if (mealsData) setMeals(mealsData)
+    if (mealsData) setMeals(mealsData)
 
-  // Buscar metas
-  const { data: goalData } = await supabase
-    .from('diet_goals')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
+    const { data: goalData } = await supabase.from('diet_goals').select('*').eq('user_id', user.id).single()
 
-  // Buscar plano do dia
-  const { data: planData } = await supabase
-    .from('diet_plan')
-    .select('calories, protein, carbs, fat')
-    .eq('user_id', user.id)
-    .eq('day_of_week', todayDayOfWeek)
+    const { data: planData } = await supabase
+      .from('diet_plan').select('calories, protein, carbs, fat')
+      .eq('user_id', user.id).eq('day_of_week', todayDayOfWeek)
 
-  if (planData && planData.length > 0) {
-    // Usar as kcal do plano do dia
-    const planCalories = planData.reduce((sum, m) => sum + (m.calories || 0), 0)
-    const planProtein = planData.reduce((sum, m) => sum + (m.protein || 0), 0)
-    const planCarbs = planData.reduce((sum, m) => sum + (m.carbs || 0), 0)
-    const planFat = planData.reduce((sum, m) => sum + (m.fat || 0), 0)
+    if (planData && planData.length > 0) {
+      setGoal({
+        daily_calories: planData.reduce((sum, m) => sum + (m.calories || 0), 0),
+        daily_protein: planData.reduce((sum, m) => sum + (m.protein || 0), 0),
+        daily_carbs: planData.reduce((sum, m) => sum + (m.carbs || 0), 0),
+        daily_fat: planData.reduce((sum, m) => sum + (m.fat || 0), 0),
+      })
+    } else if (goalData) {
+      setGoal(goalData)
+      setGoalInputs({
+        calories: String(goalData.daily_calories),
+        protein: String(goalData.daily_protein),
+        carbs: String(goalData.daily_carbs),
+        fat: String(goalData.daily_fat),
+      })
+    }
 
-    setGoal({
-      daily_calories: planCalories,
-      daily_protein: planProtein,
-      daily_carbs: planCarbs,
-      daily_fat: planFat,
-    })
-  } else if (goalData) {
-    // Se não houver plano, usar as metas genéricas
-    setGoal(goalData)
-    setGoalInputs({
-      calories: String(goalData.daily_calories),
-      protein: String(goalData.daily_protein),
-      carbs: String(goalData.daily_carbs),
-      fat: String(goalData.daily_fat),
-    })
+    setLoading(false)
   }
-
-  setLoading(false)
-}
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
 
@@ -112,7 +98,6 @@ export default function Diet() {
     try {
       const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!)
       const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
-
       const response = await fetch(imageUri)
       const blob = await response.blob()
       const base64 = await new Promise<string>((resolve) => {
@@ -120,37 +105,16 @@ export default function Diet() {
         reader.onloadend = () => resolve((reader.result as string).split(',')[1])
         reader.readAsDataURL(blob)
       })
-
       const prompt = `Analisa esta imagem de comida e estima os valores nutricionais. 
       Responde APENAS em formato JSON válido, sem markdown, sem texto extra, exatamente assim:
       {"name":"nome do prato em português","calories":000,"protein":00,"carbs":00,"fat":00}
-      
-      Onde:
-      - name: nome do prato em português
-      - calories: calorias totais (número inteiro)
-      - protein: proteínas em gramas (número inteiro)
-      - carbs: hidratos de carbono em gramas (número inteiro)
-      - fat: gorduras em gramas (número inteiro)
-      
       Se não conseguires identificar comida na imagem, responde: {"error":"Não foi possível identificar comida na imagem"}`
-
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { data: base64, mimeType: 'image/jpeg' } }
-      ])
-
+      const result = await model.generateContent([prompt, { inlineData: { data: base64, mimeType: 'image/jpeg' } }])
       const text = result.response.text().trim()
       const parsed = JSON.parse(text)
-
-      if (parsed.error) {
-        Alert.alert('Erro', parsed.error)
-        setAnalyzing(false)
-        return
-      }
-
+      if (parsed.error) { Alert.alert('Erro', parsed.error); setAnalyzing(false); return }
       setAiResult(parsed)
     } catch (e: any) {
-      console.log('Erro:', e?.message)
       Alert.alert('Erro', 'Não foi possível analisar a imagem. Tenta novamente.')
     }
     setAnalyzing(false)
@@ -158,101 +122,44 @@ export default function Diet() {
 
   async function takePicture() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permissão negada', 'Precisamos de acesso à câmara!')
-      return
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    })
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri)
-      setAiResult(null)
-      await analyzeWithGemini(result.assets[0].uri)
-    }
+    if (status !== 'granted') { Alert.alert('Permissão negada', 'Precisamos de acesso à câmara!'); return }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.7 })
+    if (!result.canceled) { setSelectedImage(result.assets[0].uri); setAiResult(null); await analyzeWithGemini(result.assets[0].uri) }
   }
 
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permissão negada', 'Precisamos de acesso à galeria!')
-      return
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    })
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri)
-      setAiResult(null)
-      await analyzeWithGemini(result.assets[0].uri)
-    }
+    if (status !== 'granted') { Alert.alert('Permissão negada', 'Precisamos de acesso à galeria!'); return }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.7 })
+    if (!result.canceled) { setSelectedImage(result.assets[0].uri); setAiResult(null); await analyzeWithGemini(result.assets[0].uri) }
   }
 
   async function saveMeal() {
     if (!aiResult) return
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     let photoUrl = null
-
     if (selectedImage) {
       const formData = new FormData()
-      formData.append('file', {
-        uri: selectedImage,
-        name: 'meal.jpg',
-        type: 'image/jpeg',
-      } as any)
-
+      formData.append('file', { uri: selectedImage, name: 'meal.jpg', type: 'image/jpeg' } as any)
       const filename = `${user.id}/meals/${Date.now()}.jpg`
-      const { error: uploadError } = await supabase.storage
-        .from('habit-photos')
-        .upload(filename, formData, { contentType: 'image/jpeg' })
-
+      const { error: uploadError } = await supabase.storage.from('habit-photos').upload(filename, formData, { contentType: 'image/jpeg' })
       if (!uploadError) {
-        const { data: { publicUrl } } = supabase.storage
-          .from('habit-photos')
-          .getPublicUrl(filename)
+        const { data: { publicUrl } } = supabase.storage.from('habit-photos').getPublicUrl(filename)
         photoUrl = publicUrl
       }
     }
-
     const { error } = await supabase.from('meals').insert({
-      user_id: user.id,
-      name: aiResult.name,
-      photo_url: photoUrl,
-      calories: aiResult.calories,
-      protein: aiResult.protein,
-      carbs: aiResult.carbs,
-      fat: aiResult.fat,
-      meal_type: selectedMealType,
+      user_id: user.id, name: aiResult.name, photo_url: photoUrl,
+      calories: aiResult.calories, protein: aiResult.protein, carbs: aiResult.carbs, fat: aiResult.fat, meal_type: selectedMealType,
     })
-
-    if (error) {
-      Alert.alert('Erro', error.message)
-    } else {
-      setShowAddModal(false)
-      setSelectedImage(null)
-      setAiResult(null)
-      fetchData()
-      Alert.alert('✅ Refeição guardada!')
-    }
+    if (error) { Alert.alert('Erro', error.message) }
+    else { setShowAddModal(false); setSelectedImage(null); setAiResult(null); fetchData(); Alert.alert('✅ Refeição guardada!') }
   }
 
   async function saveGoal() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const newGoal = {
       user_id: user.id,
       daily_calories: parseInt(goalInputs.calories),
@@ -260,19 +167,9 @@ export default function Diet() {
       daily_carbs: parseInt(goalInputs.carbs),
       daily_fat: parseInt(goalInputs.fat),
     }
-
-    const { data: existing } = await supabase
-      .from('diet_goals')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (existing) {
-      await supabase.from('diet_goals').update(newGoal).eq('user_id', user.id)
-    } else {
-      await supabase.from('diet_goals').insert(newGoal)
-    }
-
+    const { data: existing } = await supabase.from('diet_goals').select('id').eq('user_id', user.id).single()
+    if (existing) { await supabase.from('diet_goals').update(newGoal).eq('user_id', user.id) }
+    else { await supabase.from('diet_goals').insert(newGoal) }
     setGoal(newGoal)
     setShowGoalModal(false)
     Alert.alert('✅ Meta atualizada!')
@@ -281,13 +178,7 @@ export default function Diet() {
   async function deleteMeal(id: string) {
     Alert.alert('Apagar refeição', 'Tens a certeza?', [
       { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Apagar', style: 'destructive',
-        onPress: async () => {
-          await supabase.from('meals').delete().eq('id', id)
-          fetchData()
-        }
-      }
+      { text: 'Apagar', style: 'destructive', onPress: async () => { await supabase.from('meals').delete().eq('id', id); fetchData() } }
     ])
   }
 
@@ -298,83 +189,66 @@ export default function Diet() {
   const caloriesPercent = Math.min((totalCalories / goal.daily_calories) * 100, 100)
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: tabBarHeight }}
+    >
       <View style={styles.headerRow}>
-        <Text style={styles.title}>🥗 Dieta</Text>
+        <Text style={[styles.title, { color: colors.text }]}>🥗 Dieta</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => router.push('/diet-plan' as any)} style={{ marginRight: 16 }}>
-            <Ionicons name="calendar-outline" size={24} color="#6c63ff" />
+            <Ionicons name="calendar-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowGoalModal(true)}>
-            <Ionicons name="settings-outline" size={24} color="#888" />
+            <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Card de calorias */}
-      <View style={styles.caloriesCard}>
+      <View style={[styles.caloriesCard, { backgroundColor: colors.card }]}>
         <View style={styles.caloriesRow}>
           <View>
-            <Text style={styles.caloriesValue}>{totalCalories}</Text>
-            <Text style={styles.caloriesLabel}>kcal consumidas</Text>
+            <Text style={[styles.caloriesValue, { color: colors.text }]}>{totalCalories}</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal consumidas</Text>
           </View>
-          <View style={styles.caloriesDivider} />
+          <View style={[styles.caloriesDivider, { backgroundColor: colors.card2 }]} />
           <View>
-            <Text style={styles.caloriesValue}>{goal.daily_calories - totalCalories}</Text>
-            <Text style={styles.caloriesLabel}>kcal restantes</Text>
+            <Text style={[styles.caloriesValue, { color: colors.text }]}>{goal.daily_calories - totalCalories}</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal restantes</Text>
           </View>
-          <View style={styles.caloriesDivider} />
+          <View style={[styles.caloriesDivider, { backgroundColor: colors.card2 }]} />
           <View>
-            <Text style={styles.caloriesValue}>{goal.daily_calories}</Text>
-            <Text style={styles.caloriesLabel}>kcal meta</Text>
+            <Text style={[styles.caloriesValue, { color: colors.text }]}>{goal.daily_calories}</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal meta</Text>
           </View>
         </View>
-        <View style={styles.caloriesBar}>
+        <View style={[styles.caloriesBar, { backgroundColor: colors.card2 }]}>
           <View style={[styles.caloriesBarFill, {
             width: `${caloriesPercent}%`,
-            backgroundColor: caloriesPercent > 90 ? '#ff6584' : '#43e97b'
+            backgroundColor: caloriesPercent > 90 ? colors.danger : colors.success
           }]} />
         </View>
       </View>
 
-      {/* Macros */}
       <View style={styles.macrosRow}>
-        <View style={styles.macroCard}>
-          <Text style={styles.macroValue}>{totalProtein}g</Text>
-          <Text style={styles.macroLabel}>Proteína</Text>
-          <View style={styles.macroBar}>
-            <View style={[styles.macroBarFill, {
-              width: `${Math.min((totalProtein / goal.daily_protein) * 100, 100)}%`,
-              backgroundColor: '#4facfe'
-            }]} />
+        {[
+          { label: 'Proteína', value: totalProtein, goal: goal.daily_protein, color: '#4facfe' },
+          { label: 'Hidratos', value: totalCarbs, goal: goal.daily_carbs, color: '#f7971e' },
+          { label: 'Gordura', value: totalFat, goal: goal.daily_fat, color: colors.danger },
+        ].map(macro => (
+          <View key={macro.label} style={[styles.macroCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.macroValue, { color: colors.text }]}>{macro.value}g</Text>
+            <Text style={[styles.macroLabel, { color: colors.textSecondary }]}>{macro.label}</Text>
+            <View style={[styles.macroBar, { backgroundColor: colors.card2 }]}>
+              <View style={[styles.macroBarFill, { width: `${Math.min((macro.value / macro.goal) * 100, 100)}%`, backgroundColor: macro.color }]} />
+            </View>
           </View>
-        </View>
-        <View style={styles.macroCard}>
-          <Text style={styles.macroValue}>{totalCarbs}g</Text>
-          <Text style={styles.macroLabel}>Hidratos</Text>
-          <View style={styles.macroBar}>
-            <View style={[styles.macroBarFill, {
-              width: `${Math.min((totalCarbs / goal.daily_carbs) * 100, 100)}%`,
-              backgroundColor: '#f7971e'
-            }]} />
-          </View>
-        </View>
-        <View style={styles.macroCard}>
-          <Text style={styles.macroValue}>{totalFat}g</Text>
-          <Text style={styles.macroLabel}>Gordura</Text>
-          <View style={styles.macroBar}>
-            <View style={[styles.macroBarFill, {
-              width: `${Math.min((totalFat / goal.daily_fat) * 100, 100)}%`,
-              backgroundColor: '#ff6584'
-            }]} />
-          </View>
-        </View>
+        ))}
       </View>
 
-      {/* Lista de refeições */}
       <View style={styles.mealsHeader}>
-        <Text style={styles.sectionTitle}>Refeições de hoje</Text>
-        <TouchableOpacity style={styles.addMealBtn} onPress={() => setShowAddModal(true)}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Refeições de hoje</Text>
+        <TouchableOpacity style={[styles.addMealBtn, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
           <Ionicons name="add" size={20} color="#ffffff" />
           <Text style={styles.addMealText}>Adicionar</Text>
         </TouchableOpacity>
@@ -383,124 +257,95 @@ export default function Diet() {
       {meals.length === 0 ? (
         <View style={styles.emptyMeals}>
           <Text style={styles.emptyEmoji}>🍽️</Text>
-          <Text style={styles.emptyText}>Ainda não registaste refeições hoje</Text>
-          <Text style={styles.emptySub}>Tira uma foto à tua refeição e a IA analisa as kcal!</Text>
+          <Text style={[styles.emptyText, { color: colors.text }]}>Ainda não registaste refeições hoje</Text>
+          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Tira uma foto à tua refeição e a IA analisa as kcal!</Text>
         </View>
       ) : (
         meals.map(meal => (
-          <TouchableOpacity
-            key={meal.id}
-            style={styles.mealCard}
-            onLongPress={() => deleteMeal(meal.id)}
-          >
-            {meal.photo_url && (
-              <Image source={{ uri: meal.photo_url }} style={styles.mealPhoto} />
-            )}
+          <TouchableOpacity key={meal.id} style={[styles.mealCard, { backgroundColor: colors.card }]} onLongPress={() => deleteMeal(meal.id)}>
+            {meal.photo_url && <Image source={{ uri: meal.photo_url }} style={styles.mealPhoto} />}
             <View style={styles.mealInfo}>
-              <Text style={styles.mealName}>{meal.name}</Text>
-              <Text style={styles.mealType}>
+              <Text style={[styles.mealName, { color: colors.text }]}>{meal.name}</Text>
+              <Text style={[styles.mealType, { color: colors.textSecondary }]}>
                 {MEAL_TYPES.find(t => t.id === meal.meal_type)?.icon} {MEAL_TYPES.find(t => t.id === meal.meal_type)?.label}
               </Text>
               <View style={styles.mealMacros}>
-                <Text style={styles.mealMacroText}>P: {meal.protein}g</Text>
-                <Text style={styles.mealMacroText}>H: {meal.carbs}g</Text>
-                <Text style={styles.mealMacroText}>G: {meal.fat}g</Text>
+                <Text style={[styles.mealMacroText, { color: colors.textMuted }]}>P: {meal.protein}g</Text>
+                <Text style={[styles.mealMacroText, { color: colors.textMuted }]}>H: {meal.carbs}g</Text>
+                <Text style={[styles.mealMacroText, { color: colors.textMuted }]}>G: {meal.fat}g</Text>
               </View>
             </View>
-            <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
+            <Text style={[styles.mealCalories, { color: colors.primary }]}>{meal.calories} kcal</Text>
           </TouchableOpacity>
         ))
       )}
 
-      <Text style={styles.hint}>💡 Mantém pressionado para apagar uma refeição</Text>
+      <Text style={[styles.hint, { color: colors.textMuted }]}>💡 Mantém pressionado para apagar uma refeição</Text>
 
       {/* Modal adicionar refeição */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={styles.addModal}>
-            <Text style={styles.modalTitle}>Nova Refeição</Text>
-
-            <Text style={styles.modalLabel}>Tipo</Text>
+          <ScrollView style={[styles.addModal, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Nova Refeição</Text>
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Tipo</Text>
             <View style={styles.mealTypeRow}>
               {MEAL_TYPES.map(type => (
                 <TouchableOpacity
                   key={type.id}
-                  style={[styles.mealTypeBtn, selectedMealType === type.id && styles.mealTypeBtnActive]}
+                  style={[styles.mealTypeBtn, { backgroundColor: colors.background, borderColor: 'transparent' },
+                    selectedMealType === type.id && { borderColor: colors.primary, backgroundColor: colors.primary + '22' }]}
                   onPress={() => setSelectedMealType(type.id)}
                 >
                   <Text style={styles.mealTypeIcon}>{type.icon}</Text>
-                  <Text style={[styles.mealTypeLabelSmall, selectedMealType === type.id && { color: '#6c63ff' }]}>
-                    {type.label}
-                  </Text>
+                  <Text style={[styles.mealTypeLabelSmall, { color: colors.textSecondary },
+                    selectedMealType === type.id && { color: colors.primary }]}>{type.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-
-            <Text style={styles.modalLabel}>Foto da refeição</Text>
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Foto da refeição</Text>
             <View style={styles.photoButtons}>
-              <TouchableOpacity style={styles.photoBtn} onPress={takePicture}>
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.primary }]} onPress={takePicture}>
                 <Ionicons name="camera" size={24} color="#ffffff" />
                 <Text style={styles.photoBtnText}>Câmara</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.photoBtn, styles.photoBtnOutline]} onPress={pickFromGallery}>
-                <Ionicons name="images" size={24} color="#6c63ff" />
-                <Text style={[styles.photoBtnText, { color: '#6c63ff' }]}>Galeria</Text>
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary }]} onPress={pickFromGallery}>
+                <Ionicons name="images" size={24} color={colors.primary} />
+                <Text style={[styles.photoBtnText, { color: colors.primary }]}>Galeria</Text>
               </TouchableOpacity>
             </View>
-
-            {selectedImage && (
-              <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
-            )}
-
+            {selectedImage && <Image source={{ uri: selectedImage }} style={styles.imagePreview} />}
             {analyzing && (
               <View style={styles.analyzingContainer}>
-                <ActivityIndicator size="large" color="#6c63ff" />
-                <Text style={styles.analyzingText}>🤖 A IA está a analisar a tua refeição...</Text>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.analyzingText, { color: colors.textSecondary }]}>🤖 A IA está a analisar a tua refeição...</Text>
               </View>
             )}
-
             {aiResult && (
-              <View style={styles.aiResult}>
-                <Text style={styles.aiResultTitle}>🤖 Análise da IA</Text>
-                <Text style={styles.aiResultName}>{aiResult.name}</Text>
+              <View style={[styles.aiResult, { backgroundColor: colors.background }]}>
+                <Text style={[styles.aiResultTitle, { color: colors.primary }]}>🤖 Análise da IA</Text>
+                <Text style={[styles.aiResultName, { color: colors.text }]}>{aiResult.name}</Text>
                 <View style={styles.aiMacros}>
-                  <View style={styles.aiMacroItem}>
-                    <Text style={styles.aiMacroValue}>{aiResult.calories}</Text>
-                    <Text style={styles.aiMacroLabel}>kcal</Text>
-                  </View>
-                  <View style={styles.aiMacroItem}>
-                    <Text style={styles.aiMacroValue}>{aiResult.protein}g</Text>
-                    <Text style={styles.aiMacroLabel}>Proteína</Text>
-                  </View>
-                  <View style={styles.aiMacroItem}>
-                    <Text style={styles.aiMacroValue}>{aiResult.carbs}g</Text>
-                    <Text style={styles.aiMacroLabel}>Hidratos</Text>
-                  </View>
-                  <View style={styles.aiMacroItem}>
-                    <Text style={styles.aiMacroValue}>{aiResult.fat}g</Text>
-                    <Text style={styles.aiMacroLabel}>Gordura</Text>
-                  </View>
+                  {[
+                    { value: aiResult.calories, label: 'kcal' },
+                    { value: `${aiResult.protein}g`, label: 'Proteína' },
+                    { value: `${aiResult.carbs}g`, label: 'Hidratos' },
+                    { value: `${aiResult.fat}g`, label: 'Gordura' },
+                  ].map(item => (
+                    <View key={item.label} style={styles.aiMacroItem}>
+                      <Text style={[styles.aiMacroValue, { color: colors.text }]}>{item.value}</Text>
+                      <Text style={[styles.aiMacroLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                    </View>
+                  ))}
                 </View>
-                <Text style={styles.aiDisclaimer}>* Valores estimados pela IA, podem não ser 100% precisos</Text>
+                <Text style={[styles.aiDisclaimer, { color: colors.textMuted }]}>* Valores estimados pela IA, podem não ser 100% precisos</Text>
               </View>
             )}
-
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => {
-                  setShowAddModal(false)
-                  setSelectedImage(null)
-                  setAiResult(null)
-                }}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+              <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: colors.card2 }]}
+                onPress={() => { setShowAddModal(false); setSelectedImage(null); setAiResult(null) }}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalConfirmBtn, !aiResult && styles.modalConfirmBtnDisabled]}
-                onPress={saveMeal}
-                disabled={!aiResult}
-              >
+              <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: !aiResult ? colors.card2 : colors.primary }]} onPress={saveMeal} disabled={!aiResult}>
                 <Text style={styles.modalConfirmText}>Guardar</Text>
               </TouchableOpacity>
             </View>
@@ -511,8 +356,8 @@ export default function Diet() {
       {/* Modal metas */}
       <Modal visible={showGoalModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.goalModal}>
-            <Text style={styles.modalTitle}>🎯 Metas diárias</Text>
+          <View style={[styles.goalModal, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>🎯 Metas diárias</Text>
             {[
               { key: 'calories', label: 'Calorias (kcal)' },
               { key: 'protein', label: 'Proteína (g)' },
@@ -520,21 +365,21 @@ export default function Diet() {
               { key: 'fat', label: 'Gordura (g)' },
             ].map(field => (
               <View key={field.key} style={styles.goalField}>
-                <Text style={styles.modalLabel}>{field.label}</Text>
+                <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>{field.label}</Text>
                 <TextInput
-                  style={styles.goalInput}
+                  style={[styles.goalInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   value={goalInputs[field.key as keyof typeof goalInputs]}
                   onChangeText={v => setGoalInputs(prev => ({ ...prev, [field.key]: v }))}
                   keyboardType="numeric"
-                  placeholderTextColor="#888"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
             ))}
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowGoalModal(false)}>
-                <Text style={styles.modalCancelText}>Cancelar</Text>
+              <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: colors.card2 }]} onPress={() => setShowGoalModal(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={saveGoal}>
+              <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: colors.primary }]} onPress={saveGoal}>
                 <Text style={styles.modalConfirmText}>Guardar</Text>
               </TouchableOpacity>
             </View>
@@ -546,86 +391,68 @@ export default function Diet() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a', padding: 20, paddingTop: 56 },
+  container: { flex: 1, padding: 20, paddingTop: 56 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#ffffff' },
+  title: { fontSize: 28, fontWeight: 'bold' },
   headerIcons: { flexDirection: 'row', alignItems: 'center' },
-  caloriesCard: { backgroundColor: '#1e1e2e', borderRadius: 20, padding: 20, marginBottom: 16 },
+  caloriesCard: { borderRadius: 20, padding: 20, marginBottom: 16 },
   caloriesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  caloriesValue: { fontSize: 24, fontWeight: 'bold', color: '#ffffff', textAlign: 'center' },
-  caloriesLabel: { fontSize: 11, color: '#888', textAlign: 'center', marginTop: 2 },
-  caloriesDivider: { width: 1, height: 40, backgroundColor: '#2e2e3e' },
-  caloriesBar: { height: 8, backgroundColor: '#2e2e3e', borderRadius: 4, overflow: 'hidden' },
+  caloriesValue: { fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
+  caloriesLabel: { fontSize: 11, textAlign: 'center', marginTop: 2 },
+  caloriesDivider: { width: 1, height: 40 },
+  caloriesBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   caloriesBarFill: { height: '100%', borderRadius: 4 },
   macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  macroCard: { flex: 1, backgroundColor: '#1e1e2e', borderRadius: 16, padding: 12 },
-  macroValue: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
-  macroLabel: { fontSize: 11, color: '#888', marginBottom: 8 },
-  macroBar: { height: 4, backgroundColor: '#2e2e3e', borderRadius: 2, overflow: 'hidden' },
+  macroCard: { flex: 1, borderRadius: 16, padding: 12 },
+  macroValue: { fontSize: 18, fontWeight: 'bold' },
+  macroLabel: { fontSize: 11, marginBottom: 8 },
+  macroBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
   macroBarFill: { height: '100%', borderRadius: 2 },
   mealsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
-  addMealBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#6c63ff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  addMealBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   addMealText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 },
   emptyMeals: { alignItems: 'center', paddingVertical: 40 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
-  emptySub: { color: '#888', fontSize: 13, textAlign: 'center' },
-  mealCard: {
-    backgroundColor: '#1e1e2e', borderRadius: 16, padding: 16,
-    marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
+  emptyText: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  emptySub: { fontSize: 13, textAlign: 'center' },
+  mealCard: { borderRadius: 16, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
   mealPhoto: { width: 64, height: 64, borderRadius: 12 },
   mealInfo: { flex: 1 },
-  mealName: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 4 },
-  mealType: { color: '#888', fontSize: 12, marginBottom: 6 },
+  mealName: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  mealType: { fontSize: 12, marginBottom: 6 },
   mealMacros: { flexDirection: 'row', gap: 8 },
-  mealMacroText: { color: '#555', fontSize: 11 },
-  mealCalories: { color: '#6c63ff', fontSize: 16, fontWeight: 'bold' },
-  hint: { color: '#555', fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 32 },
+  mealMacroText: { fontSize: 11 },
+  mealCalories: { fontSize: 16, fontWeight: 'bold' },
+  hint: { fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 32 },
   modalOverlay: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
-  addModal: { backgroundColor: '#1e1e2e', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
-  goalModal: { backgroundColor: '#1e1e2e', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#ffffff', marginBottom: 24 },
-  modalLabel: { fontSize: 13, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
+  addModal: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '90%' },
+  goalModal: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 24 },
+  modalLabel: { fontSize: 13, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
   mealTypeRow: { flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' },
-  mealTypeBtn: {
-    flex: 1, minWidth: 70, alignItems: 'center', padding: 10,
-    backgroundColor: '#0f0f1a', borderRadius: 12, borderWidth: 2, borderColor: 'transparent',
-  },
-  mealTypeBtnActive: { borderColor: '#6c63ff', backgroundColor: '#6c63ff22' },
+  mealTypeBtn: { flex: 1, minWidth: 70, alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 2 },
   mealTypeIcon: { fontSize: 20, marginBottom: 4 },
-  mealTypeLabelSmall: { fontSize: 10, color: '#888', textAlign: 'center' },
+  mealTypeLabelSmall: { fontSize: 10, textAlign: 'center' },
   photoButtons: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  photoBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#6c63ff', borderRadius: 12, padding: 14,
-  },
-  photoBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#6c63ff' },
+  photoBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, padding: 14 },
   photoBtnText: { color: '#ffffff', fontWeight: 'bold' },
   imagePreview: { width: '100%', height: 200, borderRadius: 16, marginBottom: 16 },
   analyzingContainer: { alignItems: 'center', padding: 24, gap: 12 },
-  analyzingText: { color: '#888', fontSize: 14, textAlign: 'center' },
-  aiResult: { backgroundColor: '#0f0f1a', borderRadius: 16, padding: 16, marginBottom: 24 },
-  aiResultTitle: { fontSize: 14, color: '#6c63ff', fontWeight: 'bold', marginBottom: 8 },
-  aiResultName: { fontSize: 18, color: '#ffffff', fontWeight: 'bold', marginBottom: 16 },
+  analyzingText: { fontSize: 14, textAlign: 'center' },
+  aiResult: { borderRadius: 16, padding: 16, marginBottom: 24 },
+  aiResultTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
+  aiResultName: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   aiMacros: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   aiMacroItem: { alignItems: 'center' },
-  aiMacroValue: { fontSize: 20, fontWeight: 'bold', color: '#ffffff' },
-  aiMacroLabel: { fontSize: 11, color: '#888', marginTop: 2 },
-  aiDisclaimer: { color: '#555', fontSize: 11, fontStyle: 'italic' },
+  aiMacroValue: { fontSize: 20, fontWeight: 'bold' },
+  aiMacroLabel: { fontSize: 11, marginTop: 2 },
+  aiDisclaimer: { fontSize: 11, fontStyle: 'italic' },
   goalField: { marginBottom: 16 },
-  goalInput: {
-    backgroundColor: '#0f0f1a', borderRadius: 12, padding: 16,
-    color: '#ffffff', fontSize: 16, borderWidth: 1, borderColor: '#2e2e3e',
-  },
+  goalInput: { borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1 },
   modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 24 },
-  modalCancelBtn: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#2e2e3e', alignItems: 'center' },
-  modalCancelText: { color: '#888', fontWeight: 'bold' },
-  modalConfirmBtn: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#6c63ff', alignItems: 'center' },
-  modalConfirmBtnDisabled: { backgroundColor: '#2e2e3e' },
+  modalCancelBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
+  modalCancelText: { fontWeight: 'bold' },
+  modalConfirmBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
   modalConfirmText: { color: '#ffffff', fontWeight: 'bold' },
 })
