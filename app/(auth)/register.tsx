@@ -44,7 +44,7 @@ export default function Register() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, { color: colors.text }]}>LifePilot</Text>
+        <Text style={[styles.title, { color: colors.text }]}>LifePilot✈️</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('create_account')}</Text>
 
         <TextInput

@@ -10,27 +10,27 @@ type ThemeContextType = {
 }
 
 const darkColors = {
-  background: '#0f0f1a',
-  card: '#1e1e2e',
-  card2: '#2e2e3e',
+  background: '#0a1628',
+  card: '#0f2235',
+  card2: '#1a3a52',
   text: '#ffffff',
   textSecondary: '#888888',
   textMuted: '#555555',
-  border: '#2e2e3e',
-  primary: '#6c63ff',
+  border: '#1a3a52',
+  primary: '#1a9e8f',
   danger: '#ff6584',
   success: '#43e97b',
 }
 
 const lightColors = {
-  background: '#f0f0f7',
+  background: '#f0f7f6',
   card: '#ffffff',
-  card2: '#e8e8f0',
-  text: '#1a1a2e',
+  card2: '#e0f0ee',
+  text: '#0a1628',
   textSecondary: '#666666',
   textMuted: '#999999',
-  border: '#e0e0e0',
-  primary: '#6c63ff',
+  border: '#c0dedd',
+  primary: '#1a9e8f',
   danger: '#ff6584',
   success: '#2db869',
 }

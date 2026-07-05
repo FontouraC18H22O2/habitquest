@@ -53,7 +53,7 @@ export default function Login() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, { color: colors.text }]}>LifePilot</Text>
+        <Text style={[styles.title, { color: colors.text }]}>LifePilot✈️</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('welcome_back')}</Text>
 
         <TextInput
