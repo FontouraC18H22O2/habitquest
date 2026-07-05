@@ -48,39 +48,62 @@ export default function Diet() {
   const [goalInputs, setGoalInputs] = useState({ calories: '2000', protein: '150', carbs: '250', fat: '65' })
 
   async function fetchData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
 
-    const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toISOString().split('T')[0]
+  const todayDayOfWeek = new Date().getDay()
 
-    const { data: mealsData } = await supabase
-      .from('meals')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('eaten_at', `${today}T00:00:00`)
-      .lte('eaten_at', `${today}T23:59:59`)
-      .order('eaten_at', { ascending: false })
+  const { data: mealsData } = await supabase
+    .from('meals')
+    .select('*')
+    .eq('user_id', user.id)
+    .gte('eaten_at', `${today}T00:00:00`)
+    .lte('eaten_at', `${today}T23:59:59`)
+    .order('eaten_at', { ascending: false })
 
-    if (mealsData) setMeals(mealsData)
+  if (mealsData) setMeals(mealsData)
 
-    const { data: goalData } = await supabase
-      .from('diet_goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+  // Buscar metas
+  const { data: goalData } = await supabase
+    .from('diet_goals')
+    .select('*')
+    .eq('user_id', user.id)
+    .single()
 
-    if (goalData) {
-      setGoal(goalData)
-      setGoalInputs({
-        calories: String(goalData.daily_calories),
-        protein: String(goalData.daily_protein),
-        carbs: String(goalData.daily_carbs),
-        fat: String(goalData.daily_fat),
-      })
-    }
+  // Buscar plano do dia
+  const { data: planData } = await supabase
+    .from('diet_plan')
+    .select('calories, protein, carbs, fat')
+    .eq('user_id', user.id)
+    .eq('day_of_week', todayDayOfWeek)
 
-    setLoading(false)
+  if (planData && planData.length > 0) {
+    // Usar as kcal do plano do dia
+    const planCalories = planData.reduce((sum, m) => sum + (m.calories || 0), 0)
+    const planProtein = planData.reduce((sum, m) => sum + (m.protein || 0), 0)
+    const planCarbs = planData.reduce((sum, m) => sum + (m.carbs || 0), 0)
+    const planFat = planData.reduce((sum, m) => sum + (m.fat || 0), 0)
+
+    setGoal({
+      daily_calories: planCalories,
+      daily_protein: planProtein,
+      daily_carbs: planCarbs,
+      daily_fat: planFat,
+    })
+  } else if (goalData) {
+    // Se não houver plano, usar as metas genéricas
+    setGoal(goalData)
+    setGoalInputs({
+      calories: String(goalData.daily_calories),
+      protein: String(goalData.daily_protein),
+      carbs: String(goalData.daily_carbs),
+      fat: String(goalData.daily_fat),
+    })
   }
+
+  setLoading(false)
+}
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
 

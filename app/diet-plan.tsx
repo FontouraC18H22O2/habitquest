@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Modal, TextInput, ActivityIndicator
+  Alert, Modal, TextInput, ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { router } from 'expo-router'
@@ -43,9 +43,16 @@ export default function DietPlan() {
   const [generating, setGenerating] = useState(false)
   const [showGoalModal, setShowGoalModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState('maintain')
   const [selectedMeal, setSelectedMeal] = useState<PlanMeal | null>(null)
-  const [editForm, setEditForm] = useState({ meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '' })
+  const [selectedMealType, setSelectedMealType] = useState('breakfast')
+  const [editForm, setEditForm] = useState({
+    meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '',
+  })
+  const [addForm, setAddForm] = useState({
+    meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '',
+  })
   const [restrictions, setRestrictions] = useState('')
 
   useEffect(() => {
@@ -85,7 +92,7 @@ export default function DietPlan() {
       const carbs = goalData?.daily_carbs || 250
       const fat = goalData?.daily_fat || 65
 
-      const prompt = `Cria um plano alimentar semanal completo em português de Portugal para uma pessoa com o objetivo de "${goalLabel}".
+      const prompt = `Cria um plano alimentar semanal completo em português Europeu para uma pessoa com o objetivo de "${goalLabel}".
       
       Metas diárias: ${calories} kcal, ${protein}g proteína, ${carbs}g hidratos, ${fat}g gordura.
       ${restrictions ? `Restrições alimentares: ${restrictions}` : ''}
@@ -119,15 +126,9 @@ export default function DietPlan() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Apagar plano anterior
       await supabase.from('diet_plan').delete().eq('user_id', user.id)
 
-      // Inserir novo plano
-      const toInsert = meals.map((m: any) => ({
-        ...m,
-        user_id: user.id,
-      }))
-
+      const toInsert = meals.map((m: any) => ({ ...m, user_id: user.id }))
       await supabase.from('diet_plan').insert(toInsert)
       await fetchPlan()
       Alert.alert('✅ Plano gerado!', 'O teu plano semanal foi criado pela IA!')
@@ -159,6 +160,57 @@ export default function DietPlan() {
       setShowEditModal(false)
       Alert.alert('✅ Refeição atualizada!')
     }
+  }
+
+  async function addMealToPlan() {
+    if (!addForm.meal_name.trim()) {
+      Alert.alert('Erro', 'Dá um nome à refeição!')
+      return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { error } = await supabase.from('diet_plan').insert({
+      user_id: user.id,
+      day_of_week: selectedDay,
+      meal_type: selectedMealType,
+      meal_name: addForm.meal_name.trim(),
+      calories: parseInt(addForm.calories) || 0,
+      protein: parseInt(addForm.protein) || 0,
+      carbs: parseInt(addForm.carbs) || 0,
+      fat: parseInt(addForm.fat) || 0,
+      notes: addForm.notes || null,
+    })
+
+    if (!error) {
+      await fetchPlan()
+      setShowAddModal(false)
+      setAddForm({ meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '' })
+      Alert.alert('✅ Refeição adicionada!')
+    }
+  }
+
+  async function deleteMealFromPlan() {
+    if (!selectedMeal) return
+
+    Alert.alert(
+      'Apagar refeição',
+      'Tens a certeza que queres apagar esta refeição do plano?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Apagar',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('diet_plan').delete().eq('id', selectedMeal.id)
+            await fetchPlan()
+            setShowEditModal(false)
+            Alert.alert('✅ Refeição apagada!')
+          }
+        }
+      ]
+    )
   }
 
   const dayMeals = plan.filter(m => m.day_of_week === selectedDay)
@@ -212,15 +264,23 @@ export default function DietPlan() {
         <ActivityIndicator color="#6c63ff" style={{ marginTop: 40 }} />
       ) : dayMeals.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🤖</Text>
-          <Text style={styles.emptyText}>Ainda não tens um plano</Text>
-          <Text style={styles.emptySub}>Clica no ✨ para gerar um plano semanal com IA</Text>
-          <TouchableOpacity
-            style={styles.generateBtn}
-            onPress={() => setShowGoalModal(true)}
-          >
+          <Text style={styles.emptyEmoji}>🍽️</Text>
+          <Text style={styles.emptyText}>Sem plano para este dia</Text>
+          <Text style={styles.emptySub}>Gera um plano com IA ou adiciona as tuas refeições manualmente</Text>
+          <TouchableOpacity style={styles.generateBtn} onPress={() => setShowGoalModal(true)}>
             <Ionicons name="sparkles" size={20} color="#ffffff" />
-            <Text style={styles.generateBtnText}>Gerar plano com IA</Text>
+            <Text style={styles.generateBtnText}>Gerar com IA</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.generateBtn, { backgroundColor: '#1e1e2e', borderWidth: 1, borderColor: '#6c63ff', marginTop: 8 }]}
+            onPress={() => {
+              setSelectedMealType('breakfast')
+              setAddForm({ meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '' })
+              setShowAddModal(true)
+            }}
+          >
+            <Ionicons name="add" size={20} color="#6c63ff" />
+            <Text style={[styles.generateBtnText, { color: '#6c63ff' }]}>Adicionar manualmente</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -261,9 +321,17 @@ export default function DietPlan() {
                   </View>
                 </TouchableOpacity>
               ) : (
-                <View style={styles.emptyMeal}>
-                  <Text style={styles.emptyMealText}>Sem refeição planeada</Text>
-                </View>
+                <TouchableOpacity
+                  style={styles.emptyMeal}
+                  onPress={() => {
+                    setSelectedMealType(mealType.id)
+                    setAddForm({ meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '' })
+                    setShowAddModal(true)
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={24} color="#555" />
+                  <Text style={styles.emptyMealText}>Adicionar refeição</Text>
+                </TouchableOpacity>
               )}
             </View>
           )
@@ -361,11 +429,100 @@ export default function DietPlan() {
             />
 
             <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.deleteBtn} onPress={deleteMealFromPlan}>
+                <Ionicons name="trash-outline" size={16} color="#ff6584" />
+                <Text style={styles.deleteBtnText}>Apagar</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEditModal(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalConfirmBtn} onPress={saveMealEdit}>
                 <Text style={styles.modalConfirmText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modal adicionar refeição */}
+      <Modal visible={showAddModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.editModal}>
+            <Text style={styles.modalTitle}>➕ Nova Refeição</Text>
+            <Text style={styles.modalSub}>
+              {MEAL_TYPES.find(t => t.id === selectedMealType)?.icon} {MEAL_TYPES.find(t => t.id === selectedMealType)?.label} — {DAYS[selectedDay]}
+            </Text>
+
+            {/* Seletor de tipo de refeição */}
+            <Text style={styles.modalLabel}>Tipo de refeição</Text>
+            <View style={styles.mealTypeRow}>
+              {MEAL_TYPES.map(type => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={[styles.mealTypeBtn, selectedMealType === type.id && styles.mealTypeBtnActive]}
+                  onPress={() => setSelectedMealType(type.id)}
+                >
+                  <Text style={styles.mealTypeIcon}>{type.icon}</Text>
+                  <Text style={[styles.mealTypeLabelSmall, selectedMealType === type.id && { color: '#6c63ff' }]}>
+                    {type.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.modalLabel}>Nome</Text>
+            <TextInput
+              style={styles.editInput}
+              value={addForm.meal_name}
+              onChangeText={v => setAddForm(p => ({ ...p, meal_name: v }))}
+              placeholderTextColor="#888"
+              placeholder="Ex: Frango grelhado com arroz"
+              autoFocus
+            />
+
+            <View style={styles.macroInputRow}>
+              {[
+                { key: 'calories', label: 'Kcal' },
+                { key: 'protein', label: 'Proteína (g)' },
+                { key: 'carbs', label: 'Hidratos (g)' },
+                { key: 'fat', label: 'Gordura (g)' },
+              ].map(field => (
+                <View key={field.key} style={styles.macroInputItem}>
+                  <Text style={styles.modalLabel}>{field.label}</Text>
+                  <TextInput
+                    style={styles.macroInput}
+                    value={addForm[field.key as keyof typeof addForm]}
+                    onChangeText={v => setAddForm(p => ({ ...p, [field.key]: v }))}
+                    keyboardType="numeric"
+                    placeholderTextColor="#888"
+                    placeholder="0"
+                  />
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.modalLabel}>Notas (opcional)</Text>
+            <TextInput
+              style={[styles.editInput, { height: 80 }]}
+              value={addForm.notes}
+              onChangeText={v => setAddForm(p => ({ ...p, notes: v }))}
+              placeholderTextColor="#888"
+              placeholder="Dica ou nota opcional"
+              multiline
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setShowAddModal(false)
+                  setAddForm({ meal_name: '', calories: '', protein: '', carbs: '', fat: '', notes: '' })
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirmBtn} onPress={addMealToPlan}>
+                <Text style={styles.modalConfirmText}>Adicionar</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -408,10 +565,7 @@ const styles = StyleSheet.create({
   generateBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
   mealSection: { marginBottom: 20 },
   mealTypeTitle: { fontSize: 14, color: '#888', fontWeight: 'bold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
-  mealCard: {
-    backgroundColor: '#1e1e2e', borderRadius: 16, padding: 16,
-    flexDirection: 'row', alignItems: 'center',
-  },
+  mealCard: { backgroundColor: '#1e1e2e', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center' },
   mealCardInfo: { flex: 1 },
   mealName: { color: '#ffffff', fontSize: 15, fontWeight: '600', marginBottom: 4 },
   mealNotes: { color: '#888', fontSize: 12, marginBottom: 8, fontStyle: 'italic' },
@@ -423,6 +577,7 @@ const styles = StyleSheet.create({
   emptyMeal: {
     backgroundColor: '#1e1e2e', borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: '#2e2e3e', borderStyle: 'dashed',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   emptyMealText: { color: '#555', fontSize: 14, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
@@ -455,9 +610,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f0f1a', borderRadius: 12, padding: 14,
     color: '#ffffff', fontSize: 16, borderWidth: 1, borderColor: '#2e2e3e',
   },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16, marginBottom: 32 },
+  mealTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  mealTypeBtn: {
+    flex: 1, minWidth: 70, alignItems: 'center', padding: 10,
+    backgroundColor: '#0f0f1a', borderRadius: 12, borderWidth: 2, borderColor: 'transparent',
+  },
+  mealTypeBtnActive: { borderColor: '#6c63ff', backgroundColor: '#6c63ff22' },
+  mealTypeIcon: { fontSize: 20, marginBottom: 4 },
+  mealTypeLabelSmall: { fontSize: 10, color: '#888', textAlign: 'center' },
+  modalButtons: { flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 32 },
+  deleteBtn: {
+    paddingHorizontal: 16, paddingVertical: 16, borderRadius: 12,
+    backgroundColor: '#2e2e3e', alignItems: 'center', flexDirection: 'row', gap: 6,
+    borderWidth: 1, borderColor: '#ff6584',
+  },
+  deleteBtnText: { color: '#ff6584', fontWeight: 'bold', fontSize: 13 },
   modalCancelBtn: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#2e2e3e', alignItems: 'center' },
   modalCancelText: { color: '#888', fontWeight: 'bold' },
-  modalConfirmBtn: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#6c63ff', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  modalConfirmBtn: {
+    flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#6c63ff',
+    alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8,
+  },
   modalConfirmText: { color: '#ffffff', fontWeight: 'bold' },
 })
