@@ -52,10 +52,11 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "b5178aae-3454-4ed8-b077-2409db219480"
-      }
-    }
+  "supabaseUrl": "https://wknfxooymgmqgsinajhn.supabase.co",
+  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbmZ4b295bWdtcWdzaW5hamhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MzkzNzgsImV4cCI6MjA5ODQxNTM3OH0.jDYdpvhdiIClRCiqWbHu2ZIqDDeKtnjfc99-MfusAwo",
+  "eas": {
+    "projectId": "b5178aae-3454-4ed8-b077-2409db219480"
+  }
+}
   }
 }
