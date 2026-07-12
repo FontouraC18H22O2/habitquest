@@ -10,11 +10,12 @@ import { Ionicons } from '@expo/vector-icons'
 import ColorPicker, { Panel1, Swatches, Preview, HueSlider } from 'reanimated-color-picker'
 import { useTheme } from '../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const ICONS = ['💪', '📚', '💧', '🏃', '🧘', '🥗', '😴', '✍️', '🎯', '🎨', '🚴', '🏊', '🎵', '🧹', '💊', '🐕', '🌿', '☕']
 
 const PRESET_COLORS = [
-  '#6c63ff', '#ff6584', '#43e97b', '#f7971e',
+  '#1a9e8f', '#ff6584', '#43e97b', '#f7971e',
   '#4facfe', '#f953c6', '#ff6b6b', '#feca57',
   '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd',
 ]
@@ -24,9 +25,10 @@ const UNITS = ['km', 'ml', 'L', 'min', 'h', 'páginas', 'copos', 'séries', 'rep
 export default function CreateHabit() {
   const { colors } = useTheme()
   const { t } = useTranslation()
+  const insets = useSafeAreaInsets()
   const [name, setName] = useState('')
   const [selectedIcon, setSelectedIcon] = useState('🎯')
-  const [selectedColor, setSelectedColor] = useState('#6c63ff')
+  const [selectedColor, setSelectedColor] = useState('#1a9e8f')
   const [selectedCategory, setSelectedCategory] = useState('general')
   const [goalValue, setGoalValue] = useState('')
   const [goalUnit, setGoalUnit] = useState('')
@@ -91,7 +93,10 @@ export default function CreateHabit() {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+    >
       <Text style={[styles.title, { color: colors.text }]}>{t('new_habit')}</Text>
 
       <Text style={[styles.label, { color: colors.textSecondary }]}>{t('habit_name')}</Text>
@@ -261,7 +266,6 @@ export default function CreateHabit() {
         <Text style={styles.buttonText}>{loading ? t('creating') : `${selectedIcon} ${t('create_habit')}`}</Text>
       </TouchableOpacity>
 
-      {/* Modal unidades */}
       <Modal visible={showUnitPicker} transparent animationType="slide">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowUnitPicker(false)}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -279,7 +283,6 @@ export default function CreateHabit() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Modal color picker */}
       <Modal visible={showColorPicker} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.colorPickerModal, { backgroundColor: colors.card }]}>
@@ -342,7 +345,7 @@ const styles = StyleSheet.create({
   timeArrow: { fontSize: 18 },
   timeText: { fontSize: 40, fontWeight: 'bold', minWidth: 60, textAlign: 'center' },
   timeSeparator: { fontSize: 40, fontWeight: 'bold', marginBottom: 8 },
-  button: { borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
+  button: { borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 16 },
   buttonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },

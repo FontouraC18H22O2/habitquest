@@ -2,10 +2,12 @@ import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { t } = useTranslation()
 
   return (
     <Tabs screenOptions={{
@@ -23,7 +25,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Hoje',
+          title: t('today'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -32,7 +34,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Stats',
+          title: t('statistics'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart" size={size} color={color} />
           ),
@@ -41,7 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="diet"
         options={{
-          title: 'Dieta',
+          title: t('diet'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="restaurant" size={size} color={color} />
           ),
@@ -50,7 +52,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
+          title: t('profile'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

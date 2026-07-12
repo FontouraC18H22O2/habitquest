@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as Camera from 'expo-camera'
 import { useTheme } from '../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { cancelHabitReminder } from '../../lib/notifications'
 
 type Log = {
   id: string
@@ -74,10 +75,7 @@ export default function HabitDetail() {
 
   async function takePhoto() {
     const { status } = await Camera.Camera.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Erro', 'Precisamos de acesso à câmara!')
-      return
-    }
+    if (status !== 'granted') { Alert.alert('Erro', 'Precisamos de acesso à câmara!'); return }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [4, 3], quality: 0.7,
@@ -87,10 +85,7 @@ export default function HabitDetail() {
 
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Erro', 'Precisamos de acesso à galeria!')
-      return
-    }
+    if (status !== 'granted') { Alert.alert('Erro', 'Precisamos de acesso à galeria!'); return }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [4, 3], quality: 0.7,
@@ -140,6 +135,7 @@ export default function HabitDetail() {
       {
         text: t('delete'), style: 'destructive',
         onPress: async () => {
+          await cancelHabitReminder(id)
           await supabase.from('habits').delete().eq('id', id)
           router.back()
         },

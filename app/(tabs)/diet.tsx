@@ -10,6 +10,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { useTheme } from '../../lib/ThemeContext'
 import { useTabBarHeight } from '../../lib/useTabBarHeight'
+import { useTranslation } from 'react-i18next'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 type Meal = {
   id: string
@@ -31,15 +33,17 @@ type DietGoal = {
 }
 
 const MEAL_TYPES = [
-  { id: 'breakfast', label: 'Pequeno-almoço', icon: '🌅' },
-  { id: 'lunch', label: 'Almoço', icon: '☀️' },
-  { id: 'dinner', label: 'Jantar', icon: '🌙' },
-  { id: 'snack', label: 'Snack', icon: '🍎' },
+  { id: 'breakfast', label: 'breakfast', icon: '🌅' },
+  { id: 'lunch', label: 'lunch', icon: '☀️' },
+  { id: 'dinner', label: 'dinner', icon: '🌙' },
+  { id: 'snack', label: 'snack', icon: '🍎' },
 ]
 
 export default function Diet() {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const tabBarHeight = useTabBarHeight()
+  const insets = useSafeAreaInsets()
   const [meals, setMeals] = useState<Meal[]>([])
   const [goal, setGoal] = useState<DietGoal>({ daily_calories: 2000, daily_protein: 150, daily_carbs: 250, daily_fat: 65 })
   const [loading, setLoading] = useState(true)
@@ -154,7 +158,7 @@ export default function Diet() {
       calories: aiResult.calories, protein: aiResult.protein, carbs: aiResult.carbs, fat: aiResult.fat, meal_type: selectedMealType,
     })
     if (error) { Alert.alert('Erro', error.message) }
-    else { setShowAddModal(false); setSelectedImage(null); setAiResult(null); fetchData(); Alert.alert('✅ Refeição guardada!') }
+    else { setShowAddModal(false); setSelectedImage(null); setAiResult(null); fetchData(); Alert.alert(t('meal_saved')) }
   }
 
   async function saveGoal() {
@@ -172,13 +176,13 @@ export default function Diet() {
     else { await supabase.from('diet_goals').insert(newGoal) }
     setGoal(newGoal)
     setShowGoalModal(false)
-    Alert.alert('✅ Meta atualizada!')
+    Alert.alert(t('goal_updated'))
   }
 
   async function deleteMeal(id: string) {
-    Alert.alert('Apagar refeição', 'Tens a certeza?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Apagar', style: 'destructive', onPress: async () => { await supabase.from('meals').delete().eq('id', id); fetchData() } }
+    Alert.alert(t('delete_meal'), t('delete_meal_confirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('delete'), style: 'destructive', onPress: async () => { await supabase.from('meals').delete().eq('id', id); fetchData() } }
     ])
   }
 
@@ -194,7 +198,7 @@ export default function Diet() {
       contentContainerStyle={{ paddingBottom: tabBarHeight }}
     >
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: colors.text }]}>🥗 Dieta</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('diet')}</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => router.push('/diet-plan' as any)} style={{ marginRight: 16 }}>
             <Ionicons name="calendar-outline" size={24} color={colors.primary} />
@@ -209,17 +213,17 @@ export default function Diet() {
         <View style={styles.caloriesRow}>
           <View>
             <Text style={[styles.caloriesValue, { color: colors.text }]}>{totalCalories}</Text>
-            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal consumidas</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>{t('calories_consumed')}</Text>
           </View>
           <View style={[styles.caloriesDivider, { backgroundColor: colors.card2 }]} />
           <View>
             <Text style={[styles.caloriesValue, { color: colors.text }]}>{goal.daily_calories - totalCalories}</Text>
-            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal restantes</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>{t('calories_remaining')}</Text>
           </View>
           <View style={[styles.caloriesDivider, { backgroundColor: colors.card2 }]} />
           <View>
             <Text style={[styles.caloriesValue, { color: colors.text }]}>{goal.daily_calories}</Text>
-            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>kcal meta</Text>
+            <Text style={[styles.caloriesLabel, { color: colors.textSecondary }]}>{t('calories_goal')}</Text>
           </View>
         </View>
         <View style={[styles.caloriesBar, { backgroundColor: colors.card2 }]}>
@@ -232,9 +236,9 @@ export default function Diet() {
 
       <View style={styles.macrosRow}>
         {[
-          { label: 'Proteína', value: totalProtein, goal: goal.daily_protein, color: '#4facfe' },
-          { label: 'Hidratos', value: totalCarbs, goal: goal.daily_carbs, color: '#f7971e' },
-          { label: 'Gordura', value: totalFat, goal: goal.daily_fat, color: colors.danger },
+          { label: t('protein'), value: totalProtein, goal: goal.daily_protein, color: '#4facfe' },
+          { label: t('carbs'), value: totalCarbs, goal: goal.daily_carbs, color: '#f7971e' },
+          { label: t('fat'), value: totalFat, goal: goal.daily_fat, color: colors.danger },
         ].map(macro => (
           <View key={macro.label} style={[styles.macroCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.macroValue, { color: colors.text }]}>{macro.value}g</Text>
@@ -247,18 +251,18 @@ export default function Diet() {
       </View>
 
       <View style={styles.mealsHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Refeições de hoje</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('todays_meals')}</Text>
         <TouchableOpacity style={[styles.addMealBtn, { backgroundColor: colors.primary }]} onPress={() => setShowAddModal(true)}>
           <Ionicons name="add" size={20} color="#ffffff" />
-          <Text style={styles.addMealText}>Adicionar</Text>
+          <Text style={styles.addMealText}>{t('add')}</Text>
         </TouchableOpacity>
       </View>
 
       {meals.length === 0 ? (
         <View style={styles.emptyMeals}>
           <Text style={styles.emptyEmoji}>🍽️</Text>
-          <Text style={[styles.emptyText, { color: colors.text }]}>Ainda não registaste refeições hoje</Text>
-          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>Tira uma foto à tua refeição e a IA analisa as kcal!</Text>
+          <Text style={[styles.emptyText, { color: colors.text }]}>{t('no_meals')}</Text>
+          <Text style={[styles.emptySub, { color: colors.textSecondary }]}>{t('no_meals_sub')}</Text>
         </View>
       ) : (
         meals.map(meal => (
@@ -267,7 +271,7 @@ export default function Diet() {
             <View style={styles.mealInfo}>
               <Text style={[styles.mealName, { color: colors.text }]}>{meal.name}</Text>
               <Text style={[styles.mealType, { color: colors.textSecondary }]}>
-                {MEAL_TYPES.find(t => t.id === meal.meal_type)?.icon} {MEAL_TYPES.find(t => t.id === meal.meal_type)?.label}
+                {MEAL_TYPES.find(mt => mt.id === meal.meal_type)?.icon} {t(meal.meal_type)}
               </Text>
               <View style={styles.mealMacros}>
                 <Text style={[styles.mealMacroText, { color: colors.textMuted }]}>P: {meal.protein}g</Text>
@@ -280,14 +284,17 @@ export default function Diet() {
         ))
       )}
 
-      <Text style={[styles.hint, { color: colors.textMuted }]}>💡 Mantém pressionado para apagar uma refeição</Text>
+      <Text style={[styles.hint, { color: colors.textMuted }]}>{t('hold_to_delete')}</Text>
 
       {/* Modal adicionar refeição */}
       <Modal visible={showAddModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ScrollView style={[styles.addModal, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Nova Refeição</Text>
-            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Tipo</Text>
+          <ScrollView
+            style={[styles.addModal, { backgroundColor: colors.card }]}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('new_meal')}</Text>
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>{t('meal_type')}</Text>
             <View style={styles.mealTypeRow}>
               {MEAL_TYPES.map(type => (
                 <TouchableOpacity
@@ -298,38 +305,42 @@ export default function Diet() {
                 >
                   <Text style={styles.mealTypeIcon}>{type.icon}</Text>
                   <Text style={[styles.mealTypeLabelSmall, { color: colors.textSecondary },
-                    selectedMealType === type.id && { color: colors.primary }]}>{type.label}</Text>
+                    selectedMealType === type.id && { color: colors.primary }]}>{t(type.id)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Foto da refeição</Text>
+
+            <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>{t('meal_photo')}</Text>
             <View style={styles.photoButtons}>
               <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.primary }]} onPress={takePicture}>
                 <Ionicons name="camera" size={24} color="#ffffff" />
-                <Text style={styles.photoBtnText}>Câmara</Text>
+                <Text style={styles.photoBtnText}>{t('camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.photoBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary }]} onPress={pickFromGallery}>
                 <Ionicons name="images" size={24} color={colors.primary} />
-                <Text style={[styles.photoBtnText, { color: colors.primary }]}>Galeria</Text>
+                <Text style={[styles.photoBtnText, { color: colors.primary }]}>{t('gallery')}</Text>
               </TouchableOpacity>
             </View>
+
             {selectedImage && <Image source={{ uri: selectedImage }} style={styles.imagePreview} />}
+
             {analyzing && (
               <View style={styles.analyzingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.analyzingText, { color: colors.textSecondary }]}>🤖 A IA está a analisar a tua refeição...</Text>
+                <Text style={[styles.analyzingText, { color: colors.textSecondary }]}>{t('ai_analyzing')}</Text>
               </View>
             )}
+
             {aiResult && (
               <View style={[styles.aiResult, { backgroundColor: colors.background }]}>
-                <Text style={[styles.aiResultTitle, { color: colors.primary }]}>🤖 Análise da IA</Text>
+                <Text style={[styles.aiResultTitle, { color: colors.primary }]}>{t('ai_analysis')}</Text>
                 <Text style={[styles.aiResultName, { color: colors.text }]}>{aiResult.name}</Text>
                 <View style={styles.aiMacros}>
                   {[
                     { value: aiResult.calories, label: 'kcal' },
-                    { value: `${aiResult.protein}g`, label: 'Proteína' },
-                    { value: `${aiResult.carbs}g`, label: 'Hidratos' },
-                    { value: `${aiResult.fat}g`, label: 'Gordura' },
+                    { value: `${aiResult.protein}g`, label: t('protein') },
+                    { value: `${aiResult.carbs}g`, label: t('carbs') },
+                    { value: `${aiResult.fat}g`, label: t('fat') },
                   ].map(item => (
                     <View key={item.label} style={styles.aiMacroItem}>
                       <Text style={[styles.aiMacroValue, { color: colors.text }]}>{item.value}</Text>
@@ -337,16 +348,17 @@ export default function Diet() {
                     </View>
                   ))}
                 </View>
-                <Text style={[styles.aiDisclaimer, { color: colors.textMuted }]}>* Valores estimados pela IA, podem não ser 100% precisos</Text>
+                <Text style={[styles.aiDisclaimer, { color: colors.textMuted }]}>{t('ai_disclaimer')}</Text>
               </View>
             )}
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: colors.card2 }]}
                 onPress={() => { setShowAddModal(false); setSelectedImage(null); setAiResult(null) }}>
-                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: !aiResult ? colors.card2 : colors.primary }]} onPress={saveMeal} disabled={!aiResult}>
-                <Text style={styles.modalConfirmText}>Guardar</Text>
+                <Text style={styles.modalConfirmText}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -357,12 +369,12 @@ export default function Diet() {
       <Modal visible={showGoalModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.goalModal, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>🎯 Metas diárias</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('daily_goals')}</Text>
             {[
-              { key: 'calories', label: 'Calorias (kcal)' },
-              { key: 'protein', label: 'Proteína (g)' },
-              { key: 'carbs', label: 'Hidratos (g)' },
-              { key: 'fat', label: 'Gordura (g)' },
+              { key: 'calories', label: t('calories_kcal') },
+              { key: 'protein', label: t('protein_g') },
+              { key: 'carbs', label: t('carbs_g') },
+              { key: 'fat', label: t('fat_g') },
             ].map(field => (
               <View key={field.key} style={styles.goalField}>
                 <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>{field.label}</Text>
@@ -375,12 +387,12 @@ export default function Diet() {
                 />
               </View>
             ))}
-            <View style={styles.modalButtons}>
+            <View style={[styles.modalButtons, { paddingBottom: insets.bottom }]}>
               <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: colors.card2 }]} onPress={() => setShowGoalModal(false)}>
-                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: colors.primary }]} onPress={saveGoal}>
-                <Text style={styles.modalConfirmText}>Guardar</Text>
+                <Text style={styles.modalConfirmText}>{t('save')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -450,7 +462,7 @@ const styles = StyleSheet.create({
   aiDisclaimer: { fontSize: 11, fontStyle: 'italic' },
   goalField: { marginBottom: 16 },
   goalInput: { borderRadius: 12, padding: 16, fontSize: 16, borderWidth: 1 },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 24 },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8 },
   modalCancelBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
   modalCancelText: { fontWeight: 'bold' },
   modalConfirmBtn: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },

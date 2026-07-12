@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../lib/ThemeContext'
 import { useTabBarHeight } from '../../lib/useTabBarHeight'
 import { useTranslation } from 'react-i18next'
+import { cancelHabitReminder } from '../../lib/notifications'
 
 type Habit = {
   id: string
@@ -134,7 +135,7 @@ export default function Home() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: colors.text }]}>
-            {t('hello')}, {username || t('adventurer')} 👋
+            {t('hello')}, {username || t('adventurer')} 
           </Text>
           <Text style={[styles.date, { color: colors.textSecondary }]}>
             {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })}
