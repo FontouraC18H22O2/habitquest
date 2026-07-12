@@ -108,7 +108,12 @@ export default function HabitDetail() {
 
       if (uploadError) { Alert.alert('Erro', uploadError.message); return }
 
-      const { data: { publicUrl } } = supabase.storage.from('habit-photos').getPublicUrl(filename)
+      // Signed URL em vez de URL pública
+      const { data: signedData } = await supabase.storage
+        .from('habit-photos')
+        .createSignedUrl(filename, 3600)
+
+      const photoUrl = signedData?.signedUrl || null
 
       const today = new Date().toISOString().split('T')[0]
       const { data: todayLogs } = await supabase
@@ -117,7 +122,9 @@ export default function HabitDetail() {
         .order('completed_at', { ascending: false }).limit(1)
 
       if (todayLogs && todayLogs.length > 0) {
-        await supabase.from('habit_logs').insert({ habit_id: id, photo_url: publicUrl, note: t('photo_saved') })
+        await supabase.from('habit_logs').insert({
+          habit_id: id, photo_url: photoUrl, note: t('photo_saved')
+        })
         await fetchLogs()
         Alert.alert(t('photo_saved'))
       } else {
